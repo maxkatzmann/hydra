@@ -1,0 +1,34 @@
+resolution(1000) // Set how many points are used to draw each object
+
+// Draw a graph
+graph(edges: "path/to/edgelist.txt", embedding: "path/to/coordinates.txt")
+
+// Draw a lot of circles
+let R = 10.0
+for r in [0.0, R] { // Stepsize is given by the resolution, no need to set it specifically
+    for phi in [0.0, 2*M_PI] {
+        let p = Pol(r: r, phi: phi)
+        circle(center: p, radius: R)
+    }
+}
+
+// Define a point
+let o = Pol(r: 0.0, phi: 0.0)
+// Draw the point
+point(center: o, radius: 0.3)
+
+// Draw a line
+line(from: o, to: (5.0, M_PI / 2.0)) // <- Recognizes that "to" parameter is not a variable and uses values directly)
+
+let p = Pol(r: 10.0, phi: 0.0)
+curve_distance(from: o, to: p, distance: 5.0) // Draws a hypercycle of radius 5 round the line o-p
+
+let p_2 = Pol(r: 5.0, phi: 0.0)
+curve_angle(from: p_2, to: p, angle: theta(_p.r, _p.r, R)) // Draws a curve from p_2 to p, that at point _p (with radius r) has angular distance theta(r, r) to the line p_2-p. Theta needs R as a parameter. 
+
+curve_angle(from: o, to: p_2, angle: M_PI / 8.0) // Draws a circle sector from o to p_2 of angular width 2*M_PI / 8.0
+arc(center: p_2, radius 5.0, from: 0.0, to: M_PI / 2.0) // Draws an arc from 0 to M_PI / 2.0
+
+save(file: "drawing.ipe")
+
+show()
