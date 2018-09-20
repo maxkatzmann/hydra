@@ -130,53 +130,77 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
        * The second parse result must be a variable name.
        */
       if (input.children[1].type == Variable) {
-        /**
-         * First check whether the variable is not yet written.
-         */
-        std::any already_defined_value;
-        value_for_variable_in_current_scope(input.children[1].value,
-                                            already_defined_value);
 
         /**
-         * Make sure the variable is not defined already.
+         * The variable name must not be empty.
          */
-        if (!already_defined_value.has_value()) {
-
+        if (!input.children[1].value.empty()) {
           /**
-           * The value is not defined yet. Now we have to interpret
-           * what is being assigned.
+           * Variable assignments must not start with an
+           * '_'. Underscores are reserved for internal variables.
            */
-          std::any value_interpretation_result;
-
-          /**
-           * Check whether the value was interpreted successfully.
-           */
-          if (interpret_parse_result(input.children[2], value_interpretation_result)) {
-
-            DLOG(INFO) << "Assignment value interpreted successfully." << std::endl;
+          if (input.children[1].value[0] != '_') {
+            /**
+             * First check whether the variable is not yet written.
+             */
+            std::any already_defined_value;
+            value_for_variable_in_current_scope(input.children[1].value,
+                                                already_defined_value);
 
             /**
-             * Check whether we actually got a value from the
-             * interpretation.
+             * Make sure the variable is not defined already.
              */
-            if (value_interpretation_result.has_value()) {
+            if (!already_defined_value.has_value()) {
+              /**
+               * The value is not defined yet. Now we have to interpret
+               * what is being assigned.
+               */
+              std::any value_interpretation_result;
 
               /**
-               * Finish the assignment by adding the variable to the
-               * current scope.
+               * Check whether the value was interpreted successfully.
                */
-              this->scopes.back()[input.children[1].value] = value_interpretation_result;
-              result = value_interpretation_result;
-              return true;
+              if (interpret_parse_result(input.children[2],
+                                         value_interpretation_result)) {
+                DLOG(INFO) << "Assignment value interpreted successfully."
+                           << std::endl;
+
+                /**
+                 * Check whether we actually got a value from the
+                 * interpretation.
+                 */
+                if (value_interpretation_result.has_value()) {
+                  /**
+                   * Finish the assignment by adding the variable to the
+                   * current scope.
+                   */
+                  this->scopes.back()[input.children[1].value] =
+                      value_interpretation_result;
+                  result = value_interpretation_result;
+                  return true;
+                }
+              }
+            } else {
+              std::cerr << "Line: " << this->lexer.line_number
+                        << ": Redeclaration of : '" << input.children[1].value
+                        << "'." << std::endl;
+              return false;
             }
+          } else {
+            std::cerr << "Line: " << this->lexer.line_number
+                      << ": Invalid assignment: '" << input.value
+                      << "'. Variables starting with '_' cannot be assigned to."
+                      << std::endl;
+            return false;
           }
+
         } else {
           std::cerr << "Line: " << this->lexer.line_number
-                    << ": Redeclaration of : '" << input.children[1].value
-                    << "'." << std::endl;
+                    << ": Invalid assignment: The variable name must not be "
+                       "empty. Use 'let a = 5.0' instead."
+                    << std::endl;
           return false;
         }
-
       } else {
         std::cerr << "Line: " << this->lexer.line_number
                   << ": Invalid assignment: '" << input.value

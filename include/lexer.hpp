@@ -20,21 +20,24 @@
 
 #include <glog/logging.h>
 
+#include <system.hpp>
+
 namespace hydra {
 
-enum Type {
-  Argument = 0,
-  ArgumentList = 1,
-  Assignment = 2,
-  Empty = 3,
-  Error = 4,
-  Expression = 5,
-  Function = 6,
-  Loop = 7,
-  Initialization = 8,
-  Number = 9,
-  Unknown = 10,
-  Variable = 11
+/**
+ * Tokens are used to determine the different parts of a string.
+ */
+struct Token {
+  Token() {}
+  Token(const std::string &value) { this->value = value; }
+  Token(const std::string &value, Type type) {
+    this->value = value;
+    this->type = type;
+  }
+
+  std::string value = "";
+  Type type = Unknown;
+  std::vector<Token> children = {};
 };
 
 /**
@@ -46,7 +49,7 @@ struct ParseResult {
 
   ParseResult() : type(Unknown), value(""), children({}) {}
 
-  ParseResult(Type type, std::string &value) {
+  ParseResult(Type type, const std::string &value) {
     this->type = type;
     this->value = value;
   }
@@ -63,31 +66,6 @@ class Lexer {
   Lexer() {}
 
   /**
-   * Assigns each type the corresponding name.
-   */
-  static const std::unordered_map<Type, std::string, std::hash<int>>
-      name_for_type;
-
-  /**
-   * Contains all known keywords and their associated types.  E.g.:
-   * "let" is of type Assignment.
-   */
-  static const std::unordered_map<std::string, Type> types_for_keywords;
-
-  /**
-   * For a given string determines the corresponding Type, or
-   * VariableOrUnknown if no Type matched.
-   */
-  static Type type_for_string(const std::string &str);
-
-  /**
-   * Contains all known functions and the associated arguments. E.g.:
-   * "line -> from:to:"
-   */
-  static const std::unordered_map<std::string, std::vector<std::string>>
-      arguments_for_functions;
-
-  /**
    * Determines the components in a string separated by the passed
    * delimiters.
    */
@@ -102,11 +80,6 @@ class Lexer {
   static void clean_string(std::string &str);
 
   /**
-   * Determines the first token in a string.
-   */
-  static void first_token_in_string(const std::string &str, std::string &token);
-
-  /**
    * Finds the matching bracket to the one specified at position and
    * returns its index.  If the matching bracket was not found,
    * std::string::npos is returned.
@@ -115,56 +88,78 @@ class Lexer {
                                                        int position);
 
   /**
-   * Parses a line of code and tries to understand what it does. E.g.:
+   * Determines the tokens in a string.
+   */
+  bool tokenize_string(const std::string &str, std::vector<Token> &tokens);
+
+  /**
+   * Determines the type of a string.
+   */
+  Type type_of_string(const std::string &str);
+
+  /**
+   * Parses a tokenized string and tries to understand what it does. E.g.:
    * does this code represent an Assignment or a Function call, etc.
    */
-  Type identify_string(const std::string &str);
+  Type type_of_tokenized_string(const std::vector<Token> &tokenized_string);
 
   /**
    * Parses a string.
    */
-  void parse_string(const std::string &str, ParseResult &result);
+  bool parse_string(const std::string &str, ParseResult &result);
+
+  /**
+   * Parses a tokenized string.
+   */
+  bool parse_tokens(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents an assignment.
    */
-  void parse_assignment(const std::string &str, ParseResult &result);
+  bool parse_assignment(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents an initialization.  If the parsed string
    * is not an initialization, the result will have type Error.
    */
-  void parse_initialization(const std::string &str, ParseResult &result);
+  bool parse_initialization(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents a number.  If the parsed string
    * is not a number, the result will have type Error.
    */
-  void parse_number(const std::string &str, ParseResult &result);
+  bool parse_number(const std::vector<Token> &tokens, ParseResult &result);
+
+  /**
+   * Parses a string that represents an expression.  If the parsed
+   * string is not an expression, the result will have type Error.
+   */
+  bool parse_expression(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents a function.  If the parsed string
    * is not a function call, the result will have type Error.
    */
-  void parse_function(const std::string &str, ParseResult &result);
+  bool parse_function(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses the parameter list of a function call or initialization.
    */
-  void parse_argument_list(const std::string &str,
+  bool parse_argument_list(const std::vector<Token> &tokens,
                            const std::vector<std::string> &expected_arguments,
                            ParseResult &result);
-
-  /**
-   * Prints a vector of strings a argument list.
-   */
-  static void print_argument_list(const std::vector<std::string> &arguments);
 
   /**
    * Recursively prints the passed parse result.
    */
   static void print_parse_result(const ParseResult &result,
                                  const std::string &indentation = "");
+
+  /**
+   * Recursively prints the passed tokenized string.
+   */
+  static void print_tokenized_string(const std::vector<Token> &tokenized_string,
+                                     const std::string &indentation = "");
 };
 }  // namespace hydra
 

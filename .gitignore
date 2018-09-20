@@ -1,4 +1,4 @@
 /build
 /bin
-.clang_format
-.clang-complete
+.clang-format
+.clang_complete

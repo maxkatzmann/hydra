@@ -54,32 +54,39 @@ int main(int argc, char *argv[]) {
   hydra::Interpreter interpreter;
 
   hydra::Lexer lexer;
-  // std::string command = "let o = Pol(r: 0.0, phi: 0.5 * M_PI)";
-  std::string command = "let a = 5.0";
+  std::string command = "let o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
+  // std::string command = "let a = 5.0";
+  // std::string command = "for r in [0.0, 0.1, 10.0]";
+
+  std::vector<hydra::Token> tokens;
 
   hydra::ParseResult command_parse_result;
-  lexer.parse_string(command, command_parse_result);
-  hydra::Lexer::print_parse_result(command_parse_result);
-
-  std::any interpretation_result;
-
-  if (interpreter.interpret_parse_result(command_parse_result,
-                                         interpretation_result)) {
-    std::cout << "Successfully interpreted: '" << command_parse_result.value
-              << "'." << std::endl;
-    if (interpretation_result.has_value()) {
-      std::cout << "Result has value: ";
-      hydra::Interpreter::print_interpretation_result(interpretation_result);
-      std::cout << std::endl;
-    } else {
-      std::cout << "Could not get interpretation result." << std::endl;
-    }
+  bool success = lexer.parse_string(command, command_parse_result);
+  if (success) {
+    hydra::Lexer::print_parse_result(command_parse_result);
   } else {
-    std::cout << "Could not interpret '" << command_parse_result.value
-              << "' successfully." << std::endl;
+    std::cerr << "Could not parse command." << std::endl;
   }
 
-  interpreter.print_scopes();
+  // std::any interpretation_result;
+
+  // if (interpreter.interpret_parse_result(command_parse_result,
+  //                                        interpretation_result)) {
+  //   std::cout << "Successfully interpreted: '" << command_parse_result.value
+  //             << "'." << std::endl;
+  //   if (interpretation_result.has_value()) {
+  //     std::cout << "Result has value: ";
+  //     hydra::Interpreter::print_interpretation_result(interpretation_result);
+  //     std::cout << std::endl;
+  //   } else {
+  //     std::cout << "Could not get interpretation result." << std::endl;
+  //   }
+  // } else {
+  //   std::cout << "Could not interpret '" << command_parse_result.value
+  //             << "' successfully." << std::endl;
+  // }
+
+  // interpreter.print_scopes();
 
   return 0;
 }
