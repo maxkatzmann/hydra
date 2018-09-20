@@ -31,6 +31,7 @@ const std::unordered_map<Type, std::string, std::hash<int>>
         {Variable, "Variable"}};
 
 System::System() {
+
   this->types_for_keywords = {{"arc", Function},
                               {"circle", Function},
                               {"cos", Function},
@@ -88,7 +89,6 @@ void System::print_error_message(const std::string &message) {
 
   std::cerr << "> " << message << std::endl;
 }
-
 
 void System::print_argument_list(const std::vector<std::string> &arguments) {
   for (int i = 0; i < (int)arguments.size(); ++i) {

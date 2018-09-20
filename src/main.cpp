@@ -17,6 +17,8 @@
  */
 #include <lexer.hpp>
 #include <interpreter.hpp>
+#include <system.hpp>
+#include <state.hpp>
 
 /**
  * gflags / glog
@@ -55,44 +57,55 @@ int main(int argc, char *argv[]) {
   hydra::Lexer lexer(system);
   hydra::Interpreter interpreter(system);
 
-  std::string command =
-      "var o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
+  // std::string command =
+  //     "var o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
 
-  system.state.current_line = command;
-  system.state.line_number = 1;
+  std::vector<std::string> code = {
+      "var a = 5.0 // Declaring a variable",
+      "a = 3.14 // Assigning a new value",
+      "var b = 2",
+      "b = a // Assigning the value of another variable"};
 
-  // std::string command = "var a = 5.0";
-  // std::string command = "for r in [0.0, 0.1, 10.0]";
-
-  std::vector<hydra::Token> tokens;
-
-  hydra::ParseResult command_parse_result;
-  bool success = lexer.parse_string(command, command_parse_result);
-  if (success) {
-    hydra::Lexer::print_parse_result(command_parse_result);
-  } else {
-    std::cerr << "Could not parse command." << std::endl;
+  std::cout << "Interpreting code: " << std::endl << std::endl;
+  for (int line = 0; line < (int)code.size(); ++line) {
+    std::cout << line + 1 << "| " << code[line] << std::endl;
   }
+  std::cout << std::endl;
 
-  // std::any interpretation_result;
+  for (int line_index = 0; line_index < (int)code.size(); ++line_index) {
 
-  // if (interpreter.interpret_parse_result(command_parse_result,
-  //                                        interpretation_result)) {
-  //   std::cout << "Successfully interpreted: '" << command_parse_result.value
-  //             << "'." << std::endl;
-  //   if (interpretation_result.has_value()) {
-  //     std::cout << "Result has value: ";
-  //     hydra::Interpreter::print_interpretation_result(interpretation_result);
-  //     std::cout << std::endl;
-  //   } else {
-  //     std::cout << "Could not get interpretation result." << std::endl;
-  //   }
-  // } else {
-  //   std::cout << "Could not interpret '" << command_parse_result.value
-  //             << "' successfully." << std::endl;
-  // }
+    system.state.line_number = line_index + 1;
+    system.state.current_line = code[line_index];
 
-  // interpreter.print_scopes();
+    std::cout << "Interpreting line " << system.state.line_number << ": '"
+              << system.state.current_line << "'" << std::endl;
+
+    std::vector<hydra::Token> tokens;
+    hydra::ParseResult command_parse_result;
+
+    bool success = lexer.parse_string(system.state.current_line, command_parse_result);
+    if (!success) {
+      std::cerr << "Could not parse command." << std::endl;
+    }
+
+    std::any interpretation_result;
+
+    if (interpreter.interpret_parse_result(command_parse_result,
+                                           interpretation_result)) {
+      if (interpretation_result.has_value()) {
+        std::cout << "Result has value: ";
+        hydra::Interpreter::print_interpretation_result(interpretation_result);
+        std::cout << std::endl;
+      } else {
+        std::cout << "Could not get interpretation result." << std::endl;
+      }
+    } else {
+      std::cout << "Could not interpret '" << command_parse_result.value
+                << "' successfully." << std::endl;
+    }
+
+    interpreter.print_scopes();
+  }
 
   return 0;
 }

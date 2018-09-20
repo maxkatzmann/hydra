@@ -39,6 +39,7 @@ class State {
    * scopes.
    */
   std::vector<std::unordered_map<std::string, std::any>> scopes;
+
 };
 }  // namespace hydra
 

@@ -6,6 +6,7 @@
 //
 
 #include <state.hpp>
+#include <iostream>
 
 namespace hydra {
 

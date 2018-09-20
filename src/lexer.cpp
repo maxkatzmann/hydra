@@ -453,10 +453,25 @@ bool Lexer::parse_tokens(const std::vector<Token> &tokens,
   case Number:
     return parse_number(tokens, result);
   default:
-    result.type = Error;
-    this->system.print_error_message(
-        std::string("Could not parse line. Type of statement unclear."));
-    return false;
+
+    /**
+     * We don't know what to do with that. Maybe its a variable name?
+     * If we're dealing with a single token this might be the
+     * case. Otherwise something weird happened and we return an
+     * error.
+     */
+    if (tokens.size() == 1) {
+      DLOG(INFO) << "Unknown token: '" << tokens[0].value
+                 << "'. Assuming that this is a variable name..." << std::endl;
+      result.type = Unknown;
+      result.value = tokens[0].value;
+      return true;
+    } else {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Could not parse line. Type of statement unclear."));
+      return false;
+    }
   }
 }
 

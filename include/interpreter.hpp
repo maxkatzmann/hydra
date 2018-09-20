@@ -33,10 +33,10 @@ namespace hydra {
 
     /**
      * Determines the value for a variable and stores the result in
-     * value.  If no value could be determined, value.has_value()
-     * returns false.
+     * value.  If no value could be determined value_for_variable
+     * returns false and value.has_value() returns false.
      */
-    void value_for_variable(const std::string &variable, std::any &value);
+    bool value_for_variable(const std::string &variable, std::any &value);
 
     /**
      * Determines the value for a variable in the current scope and
@@ -78,6 +78,13 @@ namespace hydra {
      * interpretation.
      */
     bool interpret_number(const ParseResult &input, std::any &result);
+
+    /**
+     * Tries to interpret a variable.  Returns false if an error
+     * occurred during interpretation.  The result contains the value
+     * of the interpretation.
+     */
+    bool interpret_variable(const ParseResult &input, std::any &result);
 
     /**
      * Tries to find out what type the result is and cast it in order

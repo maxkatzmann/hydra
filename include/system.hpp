@@ -19,6 +19,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <state.hpp>
+
 namespace hydra {
 
 enum Type {
@@ -59,22 +61,6 @@ struct Func {
    */
   std::unordered_map<std::string, std::string> parameter_map = {};
 };
-
-  /**
-   * Used to store a state of a hydra program. E.g., the current line
-   * number, the current line, the scopes containing the variables.
-   */
-  struct State {
-    int line_number = -1;
-
-    std::string current_line = "";
-
-    /**
-     * Holds the variables by name and value for all currently open
-     * scopes.
-     */
-    std::vector<std::unordered_map<std::string, std::any>> scopes;
-  };
 
 class System {
 

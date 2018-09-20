@@ -14,7 +14,7 @@ namespace hydra {
 
 Interpreter::Interpreter(System &system) : system(system) {}
 
-void Interpreter::value_for_variable(const std::string &variable,
+bool Interpreter::value_for_variable(const std::string &variable,
                                      std::any &value) {
   /**
    * Reset the value to ensure that the has_value check fails when we
@@ -25,7 +25,7 @@ void Interpreter::value_for_variable(const std::string &variable,
   DLOG(INFO) << "Looking for variable '" << variable << "' in all scopes."
              << std::endl;
 
-  for (int i = this->system.state.scopes.size(); i > 0; --i) {
+  for (int i = this->system.state.scopes.size() - 1; i >= 0; --i) {
     std::unordered_map<std::string, std::any>::const_iterator
       position_of_variable = this->system.state.scopes[i].find(variable);
 
@@ -33,15 +33,18 @@ void Interpreter::value_for_variable(const std::string &variable,
       value = position_of_variable->second;
       DLOG(INFO) << "Did find variable '" << variable << "' in scope " << i
                  << "." << std::endl;
-      break;
+      return true;
     }
   }
+
+  return false;
 }
 
 void Interpreter::value_for_variable_in_current_scope(
     const std::string &variable, std::any &value) {
-  DLOG(INFO) << "Looking for variable '" << variable << "' in current scope."
-             << std::endl;
+  DLOG(INFO) << "Looking for variable '" << variable
+            << "' in current scope. (There are "
+            << this->system.state.scopes.size() << " scopes)." << std::endl;
 
   std::unordered_map<std::string, std::any>::const_iterator
     position_of_variable = this->system.state.scopes.back().find(variable);
@@ -78,11 +81,20 @@ bool Interpreter::interpret_parse_result(const ParseResult &input,
       return interpret_assignment(input, result);
     case Initialization:
       return interpret_initialization(input, result);
-  case Number:
-    return interpret_number(input, result);
+    case Number:
+      return interpret_number(input, result);
+    case Unknown:
+      /**
+       * If the type is unknown we assume that its a variable. This
+       * only works, if the input has no children.
+       */
+      if (input.children.empty()) {
+        return interpret_variable(input, result);
+      } else {
+        return false;
+      }
     default:
       return false;
-      break;
   }
 }
 
@@ -186,8 +198,8 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
             }
           } else {
             this->system.print_error_message(
-                std::string("Invalid assignment: '") + input.value +
-                "'. Variables starting with '_' cannot be assigned to.");
+                std::string("Invalid assignment. Variables starting with '_' "
+                            "cannot be assigned to."));
             return false;
           }
 
@@ -198,22 +210,78 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
           return false;
         }
       } else {
-        this->system.print_error_message(std::string("Invalid assignment: '") +
-                                         input.value +
-                                         "'. Use 'var a = 5.0' instead.");
+        this->system.print_error_message(
+            std::string("Invalid assignment. Use 'var a = 5.0' instead."));
         return false;
       }
     } else {
-      this->system.print_error_message(std::string("Invalid assignment: '") +
-                                       input.value +
-                                       "'. Use 'var a = 5.0' instead.");
+      this->system.print_error_message(
+          std::string("Invalid assignment. Use 'var a = 5.0' instead."));
+      return false;
+    }
+  } else {
+
+    /**
+     * Version 2 (without 'var'):
+     */
+
+    /**
+     * The assignment should consist of exactly two values: the name
+     * of the variable and whatever is being assigned to it.
+     */
+    if (input.children.size() == 2) {
+
+      /**
+       * We now check whether the variable is already defined.
+       */
+      std::any current_value;
+      this->value_for_variable(input.children[0].value, current_value);
+
+      if (current_value.has_value()) {
+        /**
+         * The variable was declared before. Now we have to interpret
+         * what is being assigned.
+         */
+        std::any value_interpretation_result;
+
+        /**
+         * Check whether the value was interpreted successfully.
+         */
+        if (interpret_parse_result(input.children[1],
+                                   value_interpretation_result)) {
+          DLOG(INFO) << "Assignment value interpreted successfully."
+                     << std::endl;
+
+          /**
+           * Check whether we actually got a value from the
+           * interpretation.
+           */
+          if (value_interpretation_result.has_value()) {
+            /**
+             * Finish the assignment by adding the variable to the
+             * current scope.
+             */
+            this->system.state.scopes.back()[input.children[0].value] =
+                value_interpretation_result;
+            result = value_interpretation_result;
+            return true;
+          }
+        }
+      } else {
+        this->system.print_error_message(
+            std::string(
+                "Trying to assign to undefined variable. Define the variable "
+                "first using 'var ") +
+            input.children[0].value + " = ...' instead.");
+        return false;
+      }
+
+    } else {
+      this->system.print_error_message(
+          std::string("Invalid assignment. Use 'var a = 5.0' instead."));
       return false;
     }
   }
-
-  /**
-   * Version 2 (without 'var'):
-   */
 
   return false;
 }
@@ -222,12 +290,24 @@ bool Interpreter::interpret_initialization(const ParseResult &input,
                                            std::any &result) {
   DLOG(INFO) << "Interpreting initialization with value: '" << input.value
              << "'." << std::endl;
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
   return true;
 }
 
 bool Interpreter::interpret_number(const ParseResult &input, std::any &result) {
+
   DLOG(INFO) << "Interpreting number with value: '" << input.value
              << "'." << std::endl;
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
 
   try {
     double value = stod(input.value);
@@ -239,6 +319,30 @@ bool Interpreter::interpret_number(const ParseResult &input, std::any &result) {
   }
 
   return false;
+}
+
+bool Interpreter::interpret_variable(const ParseResult &input,
+                                     std::any &result) {
+  DLOG(INFO) << "Interpreting number with value: '" << input.value
+             << "'." << std::endl;
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * We now check whether the variable is defined.
+   */
+  bool success = this->value_for_variable(input.value, result);
+
+  if (!success) {
+    this->system.print_error_message(
+        std::string("Trying to access undeclared variable '") + input.value +
+        "'. Declare the variable first using 'var " + input.value + " = ...");
+  }
+
+  return success;
 }
 
 bool Interpreter::print_interpretation_result(const std::any &result) {
