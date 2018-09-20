@@ -14,6 +14,7 @@
 #ifndef system_hpp
 #define system_hpp
 
+#include <any>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -37,10 +38,71 @@ enum Type {
   Variable = 13
 };
 
+/**
+ * How functions are represented in hydra.
+ */
+struct Func {
+  Func(const std::string &name) { this->name = name; }
+
+  Func(const std::string &name, const std::vector<std::string> &arguments) {
+    this->name = name;
+    this->arguments = arguments;
+  }
+
+  std::string name = "";
+  std::vector<std::string> arguments = {};  // The arguments of a function.
+
+  /**
+   * When interpreting the parameters of a functions, we need to be
+   * able to assign the parameters to variables within the
+   * function. This map tells us how.
+   */
+  std::unordered_map<std::string, std::string> parameter_map = {};
+};
+
+  /**
+   * Used to store a state of a hydra program. E.g., the current line
+   * number, the current line, the scopes containing the variables.
+   */
+  struct State {
+    int line_number = -1;
+
+    std::string current_line = "";
+
+    /**
+     * Holds the variables by name and value for all currently open
+     * scopes.
+     */
+    std::vector<std::unordered_map<std::string, std::any>> scopes;
+  };
+
 class System {
 
-public:
- static const std::string error_string;
+ public:
+
+  static const std::string error_string;
+
+  /**
+   * Constructor
+   */
+  System();
+
+  /**
+   * This doesn't feel right but I have no better place, yet, so the
+   * system stores the current line number.
+   */
+  int line_number = -1;
+
+  /**
+   * Also not sure whether the system should
+   */
+  std::string current_line = "";
+
+  /**
+   * The system has a state that encapsulate what the program has seen
+   * so far / is currently seeing.
+   */
+  State state;
 
  /**
   * Assigns each type the corresponding name.
@@ -50,16 +112,23 @@ public:
 
  /**
   * Contains all known keywords and their associated types.  E.g.:
-  * "let" is of type Assignment.
+  * "var" is of type Assignment.
+  *
+  * This is not static since we later want to allow the addition of
+  * custom functions.
   */
- static const std::unordered_map<std::string, Type> types_for_keywords;
+ std::unordered_map<std::string, Type> types_for_keywords;
 
  /**
   * Contains all known functions and the associated arguments. E.g.:
   * "line -> from:to:"
   */
- static const std::unordered_map<std::string, std::vector<std::string>>
-     arguments_for_functions;
+ std::unordered_map<std::string, Func> known_functions;
+
+ /**
+  * Prints an error message to the console.
+  */
+ void print_error_message(const std::string &message);
 
  /**
   * Prints a vector of strings a argument list.

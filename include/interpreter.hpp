@@ -27,15 +27,9 @@ namespace hydra {
   class Interpreter {
   public:
 
-    Interpreter();
+    Interpreter(System &system);
 
-    Lexer lexer;
-
-    /**
-     * Holds the variables by name and value for all currently open
-     * scopes.
-     */
-    std::vector<std::unordered_map<std::string, std::any>> scopes;
+    System &system;
 
     /**
      * Determines the value for a variable and stores the result in

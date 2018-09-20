@@ -12,9 +12,7 @@
 
 namespace hydra {
 
-Interpreter::Interpreter() {
-  this->scopes.push_back(std::unordered_map<std::string, std::any>());
-}
+Interpreter::Interpreter(System &system) : system(system) {}
 
 void Interpreter::value_for_variable(const std::string &variable,
                                      std::any &value) {
@@ -27,11 +25,11 @@ void Interpreter::value_for_variable(const std::string &variable,
   DLOG(INFO) << "Looking for variable '" << variable << "' in all scopes."
              << std::endl;
 
-  for (int i = this->scopes.size(); i > 0; --i) {
+  for (int i = this->system.state.scopes.size(); i > 0; --i) {
     std::unordered_map<std::string, std::any>::const_iterator
-        position_of_variable = scopes[i].find(variable);
+      position_of_variable = this->system.state.scopes[i].find(variable);
 
-    if (position_of_variable != scopes[i].end()) {
+    if (position_of_variable != this->system.state.scopes[i].end()) {
       value = position_of_variable->second;
       DLOG(INFO) << "Did find variable '" << variable << "' in scope " << i
                  << "." << std::endl;
@@ -46,9 +44,9 @@ void Interpreter::value_for_variable_in_current_scope(
              << std::endl;
 
   std::unordered_map<std::string, std::any>::const_iterator
-    position_of_variable = this->scopes.back().find(variable);
+    position_of_variable = this->system.state.scopes.back().find(variable);
 
-  if (position_of_variable != this->scopes.back().end()) {
+  if (position_of_variable != this->system.state.scopes.back().end()) {
     value = position_of_variable->second;
     DLOG(INFO) << "Did find variable '" << variable << "' in current scope."
                << std::endl;
@@ -99,21 +97,21 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
   result.reset();
 
   if (!parse_result_is_valid(input)) {
-    std::cerr << "Interpretation failed: An error occurred while parsing '"
-              << input.value << "':" << std::endl;
-    this->lexer.print_parse_result(input);
+    this->system.print_error_message(
+        std::string("Interpretation failed: An error occurred while parsing."));
+    Lexer::print_parse_result(input);
     return false;
   }
 
   /**
-   * There are two versions of assignments.  The first uses the 'let'
+   * There are two versions of assignments.  The first uses the 'var'
    * keyword and assigns a value for the first time.  The second
-   * version does not use 'let' and overwrites the value of an already
+   * version does not use 'var' and overwrites the value of an already
    * defined variable.
    */
 
   /**
-   * Version 1 (with 'let'):
+   * Version 1 (with 'var'):
    */
 
   /**
@@ -123,7 +121,7 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
   if (input.children[0].type == Assignment) {
     /**
      * A new assignment consists of exactly 3 values:
-     * let variable (=) value
+     * var variable (=) value
      */
     if (input.children.size() == 3) {
       /**
@@ -174,49 +172,47 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
                    * Finish the assignment by adding the variable to the
                    * current scope.
                    */
-                  this->scopes.back()[input.children[1].value] =
+                  this->system.state.scopes.back()[input.children[1].value] =
                       value_interpretation_result;
                   result = value_interpretation_result;
                   return true;
                 }
               }
             } else {
-              std::cerr << "Line: " << this->lexer.line_number
-                        << ": Redeclaration of : '" << input.children[1].value
-                        << "'." << std::endl;
+              this->system.print_error_message(
+                  std::string("Redeclaration of : '") +
+                  input.children[1].value + "'.");
               return false;
             }
           } else {
-            std::cerr << "Line: " << this->lexer.line_number
-                      << ": Invalid assignment: '" << input.value
-                      << "'. Variables starting with '_' cannot be assigned to."
-                      << std::endl;
+            this->system.print_error_message(
+                std::string("Invalid assignment: '") + input.value +
+                "'. Variables starting with '_' cannot be assigned to.");
             return false;
           }
 
         } else {
-          std::cerr << "Line: " << this->lexer.line_number
-                    << ": Invalid assignment: The variable name must not be "
-                       "empty. Use 'let a = 5.0' instead."
-                    << std::endl;
+          this->system.print_error_message(
+              std::string("Invalid assignment: The variable name must not be "
+                          "empty. Use 'var a = 5.0' instead."));
           return false;
         }
       } else {
-        std::cerr << "Line: " << this->lexer.line_number
-                  << ": Invalid assignment: '" << input.value
-                  << "'. Use 'let a = 5.0' instead." << std::endl;
+        this->system.print_error_message(std::string("Invalid assignment: '") +
+                                         input.value +
+                                         "'. Use 'var a = 5.0' instead.");
         return false;
       }
     } else {
-      std::cerr << "Line: " << this->lexer.line_number
-                << ": Invalid assignment: '" << input.value
-                << "'. Use 'let a = 5.0' instead." << std::endl;
+      this->system.print_error_message(std::string("Invalid assignment: '") +
+                                       input.value +
+                                       "'. Use 'var a = 5.0' instead.");
       return false;
     }
   }
 
   /**
-   * Version 2 (without 'let'):
+   * Version 2 (without 'var'):
    */
 
   return false;
@@ -238,9 +234,8 @@ bool Interpreter::interpret_number(const ParseResult &input, std::any &result) {
     result = value;
     return true;
   } catch (const std::invalid_argument &ia) {
-    std::cerr << "Line: " << this->lexer.line_number
-              << ": Interpretation failed: Invalid argument: " << ia.what()
-              << std::endl;
+    this->system.print_error_message(
+        std::string("Interpretation failed: Invalid argument: ") + ia.what());
   }
 
   return false;
@@ -258,13 +253,13 @@ bool Interpreter::print_interpretation_result(const std::any &result) {
 }
 
 void Interpreter::print_scopes() {
-  for (int i = this->scopes.size() - 1; i >= 0; --i) {
+  for (int i = this->system.state.scopes.size() - 1; i >= 0; --i) {
     this->print_scope_at_index(i);
   }
 }
 
 void Interpreter::print_scope_at_index(int index) {
-  std::cout << "Scope " << index << ": (" << this->scopes[index].size()
+  std::cout << "Scope " << index << ": (" << this->system.state.scopes[index].size()
             << " variables)" << std::endl;
 
   /**
@@ -273,7 +268,7 @@ void Interpreter::print_scope_at_index(int index) {
   std::vector<std::string> keys;
 
   for (const std::pair<std::string, std::any> &key_value :
-       this->scopes[index]) {
+       this->system.state.scopes[index]) {
     keys.push_back(key_value.first);
   }
 
@@ -284,7 +279,7 @@ void Interpreter::print_scope_at_index(int index) {
 
   for (int i = 0; i < (int)keys.size(); ++i) {
     std::cout << "  [" << i << "] " << keys[i] << " = '";
-    Interpreter::print_interpretation_result(this->scopes[index].at(keys[i]));
+    Interpreter::print_interpretation_result(this->system.state.scopes[index].at(keys[i]));
     std::cout << "'" << std::endl;
   }
 }

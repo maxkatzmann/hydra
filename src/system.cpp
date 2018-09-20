@@ -30,52 +30,65 @@ const std::unordered_map<Type, std::string, std::hash<int>>
         {Unknown, "Unknown"},
         {Variable, "Variable"}};
 
-const std::unordered_map<std::string, Type> System::types_for_keywords = {
-    {"arc", Function},
-    {"circle", Function},
-    {"cos", Function},
-    {"cosh", Function},
-    {"curve_angle", Function},
-    {"curve_distance", Function},
-    {"Euc", Initialization},
-    {"exp", Function},
-    {"for", Loop},
-    {"in", Range},
-    {"let", Assignment},
-    {"line", Function},
-    {"Pol", Initialization},
-    {"point", Function},
-    {"random", Function},
-    {"save", Function},
-    {"sin", Function},
-    {"sinh", Function},
-    {"show", Function},
-    {"theta", Function},
-    {"+", Operator},
-    {"-", Operator},
-    {"*", Operator},
-    {"/", Operator},
-    {"=", Assignment}};
+System::System() {
+  this->types_for_keywords = {{"arc", Function},
+                              {"circle", Function},
+                              {"cos", Function},
+                              {"cosh", Function},
+                              {"curve_angle", Function},
+                              {"curve_distance", Function},
+                              {"Euc", Initialization},
+                              {"exp", Function},
+                              {"for", Loop},
+                              {"in", Range},
+                              {"line", Function},
+                              {"Pol", Initialization},
+                              {"point", Function},
+                              {"random", Function},
+                              {"save", Function},
+                              {"sin", Function},
+                              {"sinh", Function},
+                              {"show", Function},
+                              {"theta", Function},
+                              {"var", Assignment},
+                              {"+", Operator},
+                              {"-", Operator},
+                              {"*", Operator},
+                              {"/", Operator},
+                              {"=", Assignment}};
 
-const std::unordered_map<std::string, std::vector<std::string>>
-    System::arguments_for_functions = {
-        {"arc", {"center", "radius", "from", "to"}},
-        {"circle", {"center", "radius"}},
-        {"cos", {"x"}},
-        {"cosh", {"x"}},
-        {"curve_angle", {"from", "to", "angle"}},
-        {"curve_distance", {"from", "to", "distance"}},
-        {"Euc", {"x", "y"}},
-        {"exp", {"x"}},
-        {"line", {"from", "to"}},
-        {"point", {"center", "radius"}},
-        {"Pol", {"r", "phi"}},
-        {"random", {"from", "to"}},
-        {"save", {"file"}},
-        {"sin", {"x"}},
-        {"sinh", {"x"}},
-        {"show", {}},
-        {"theta", {"r1", "r2", "R"}}};
+  /**
+   * The initially known functions.
+   */
+  this->known_functions = {{"arc", Func("arc", {"center", "radius", "from", "to"})},
+                           {"circle", Func("circle", {"center", "radius"})},
+                           {"cos", Func("cos", {"x"})},
+                           {"cosh", Func("cosh", {"x"})},
+                           {"curve_angle", Func("curve_angle", {"from", "to", "angle"})},
+                           {"curve_distance", Func("curve_distance", {"from", "to", "distance"})},
+                           {"Euc", Func("Euc", {"x", "y"})},
+                           {"exp", Func("exp", {"x"})},
+                           {"line", Func("line", {"from", "to"})},
+                           {"point", Func("point", {"center", "radius"})},
+                           {"Pol", Func("Pol", {"r", "phi"})},
+                           {"random", Func("random", {"from", "to"})},
+                           {"save", Func("save", {})},
+                           {"sin", Func("sin", {"x"})},
+                           {"sinh", Func("sinh", {"x"})},
+                           {"show", Func("show", {})},
+                           {"theta", Func("theta", {"r1", "r2", "R"})}};
+}
+
+void System::print_error_message(const std::string &message) {
+
+  if (this->state.line_number >= 0) {
+    std::cerr << "Error in line " << this->state.line_number << ": '"
+              << this->state.current_line << "'." << std::endl;
+  }
+
+  std::cerr << "> " << message << std::endl;
+}
+
 
 void System::print_argument_list(const std::vector<std::string> &arguments) {
   for (int i = 0; i < (int)arguments.size(); ++i) {

@@ -12,9 +12,11 @@
 
 namespace hydra {
 
+  Lexer::Lexer(System &system) : system(system) {}
+
 void Lexer::components_in_string(const std::string &str,
-                                 std::vector<std::string> &components,
-                                 const std::string &delimiters) {
+                                std::vector<std::string> &components,
+                                const std::string &delimiters) {
   /**
    * Skip delimiters at beginning.
    */
@@ -170,11 +172,16 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
        * If we didn't find a matching bracket, we have an error.
        */
       if (matching_bracket == (int)std::string::npos) {
-        std::cerr << "Line " << this->line_number << ": Missing parentheses '"
-                  << cleaned_string
-                  << "'.  Could not find a matching parenthesis for '"
-                  << cleaned_string[current_index]
-                  << "' at line index: " << current_index << "." << std::endl;
+
+        /**
+         * Print the error message.
+         */
+        this->system.print_error_message(
+            std::string("Missing parentheses: Could not find matching "
+                        "parentheses for '") +
+            cleaned_string[current_index] +
+            "' at character index: " + std::to_string(current_index) + ".");
+
         Token token(System::error_string, type_of_string(System::error_string));
         tokens.push_back(token);
         return false;
@@ -315,9 +322,9 @@ Type Lexer::type_of_string(const std::string &str) {
    * Check whether the token is keyword that we know of.
    */
   std::unordered_map<std::string, Type>::const_iterator token_type_result =
-      System::types_for_keywords.find(str);
+      this->system.types_for_keywords.find(str);
 
-  if (token_type_result != System::types_for_keywords.end()) {
+  if (token_type_result != this->system.types_for_keywords.end()) {
 
     DLOG(INFO) << "Token identified as '"
                << System::name_for_type.at(token_type_result->second) << "'."
@@ -447,9 +454,8 @@ bool Lexer::parse_tokens(const std::vector<Token> &tokens,
     return parse_number(tokens, result);
   default:
     result.type = Error;
-    std::cerr << "Could not parse line " << this->line_number
-               << ", which seems to be of type '"
-               << System::name_for_type.at(type) << "'." << std::endl;
+    this->system.print_error_message(
+        std::string("Could not parse line. Type of statement unclear."));
     return false;
   }
 }
@@ -484,10 +490,9 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
         index_of_equality_sign = index;
       } else {
         result.type = Error;
-        std::cerr << "Line " << this->line_number
-                  << ": Invalid assignment.  There must only be one assignment "
-                     "per statement."
-                  << std::endl;
+        this->system.print_error_message(
+            std::string("Invalid assignment. There must only be one assignment "
+                        "per statement."));
         return false;
       }
     } else {
@@ -508,7 +513,7 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
    */
 
   /**
-   * The index can only be 1 (a = 10.0) or 2 (let a = 10.0).
+   * The index can only be 1 (a = 10.0) or 2 (var a = 10.0).
    */
   if (index_of_equality_sign == 1) {
     /**
@@ -528,25 +533,24 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
       result.children.push_back(assignment_variable);
     } else {
       result.type = Error;
-      std::cerr
-          << "Line " << this->line_number
-          << ": Invalid assignment. Expected variable name but found '"
-          << lhs[0].value
-          << " instead. Use 'a = 10.0' or 'let a = 10.0' to assign a variable."
-          << std::endl;
+      this->system.print_error_message(
+          std::string(
+              "Invalid assignment. Expected variable name but found '") +
+          lhs[0].value +
+          " instead. Use 'a = 10.0' or 'var a = 10.0' to assign a variable.");
       return false;
     }
   } else if (index_of_equality_sign == 2) {
     /**
-     * Version: 'let a = ...'
+     * Version: 'var a = ...'
      */
 
     /**
-     * We expect a 'let' as first token.
+     * We expect a 'var' as first token.
      */
-    if (lhs[0].value == "let") {
+    if (lhs[0].value == "var") {
       /**
-       * There are exactly two tokens. The first is 'let'. Now the
+       * There are exactly two tokens. The first is 'var'. Now the
        * second has to be Unknown since it should be a variable name.
        */
       if (lhs[1].type == Unknown) {
@@ -561,28 +565,25 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
         result.children.push_back(assignment_variable);
       } else {
         result.type = Error;
-        std::cerr
-          << "Line " << this->line_number
-          << ": Invalid assignment. Expected variable name but found '"
-          << lhs[0].value
-          << " instead. Use 'a = 10.0' or 'let a = 10.0' to assign a variable."
-          << std::endl;
+        this->system.print_error_message(
+            std::string(
+                "Invalid assignment. Expected variable name but found '") +
+            lhs[0].value +
+            " instead. Use 'a = 10.0' or 'var a = 10.0' to assign a variable.");
         return false;
       }
     } else {
       result.type = Error;
-      std::cerr << "Line " << this->line_number
-                << ": Invalid assignment. 'let a = 10.0' to declare a variable."
-                << std::endl;
+      this->system.print_error_message(std::string(
+          "Invalid assignment. Use 'var a = 10.0' to declare a variable."));
       return false;
     }
 
   } else {
     result.type = Error;
-    std::cerr << "Line " << this->line_number
-              << ": Invalid assignment. Use 'a = 10.0' or 'let a = 10.0' to "
-                 "assign a variable."
-              << std::endl;
+    this->system.print_error_message(
+        std::string("Invalid assignment. Use 'a = 10.0' or 'var a = 10.0' to "
+                    "assign a variable."));
     return false;
   }
 
@@ -596,9 +597,8 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
 
   if (!success) {
     result.type = Error;
-    std::cerr << "Line " << this->line_number
-              << ": Error while parsing right hand side of assignment."
-              << std::endl;
+    this->system.print_error_message(
+        std::string("Error while parsing right hand side of assignment."));
   }
   return success;
 }
@@ -620,11 +620,11 @@ bool Lexer::parse_initialization(const std::vector<Token> &tokens,
     /**
      * Get the list of expected arguments.
      */
-    std::unordered_map<std::string, std::vector<std::string>>::const_iterator
+    std::unordered_map<std::string, Func>::const_iterator
         position_of_arguments =
-            System::arguments_for_functions.find(tokens[0].value);
+            this->system.known_functions.find(tokens[0].value);
 
-    if (position_of_arguments != System::arguments_for_functions.end()) {
+    if (position_of_arguments != this->system.known_functions.end()) {
       /**
        * The arguments of an initialization are stored as children
        * of the initialization token.
@@ -634,7 +634,7 @@ bool Lexer::parse_initialization(const std::vector<Token> &tokens,
       if (!tokens[0].children.empty()) {
         ParseResult argument_parse_result;
         bool success = Lexer::parse_argument_list(tokens[0].children,
-                                                  position_of_arguments->second,
+                                                  position_of_arguments->second.arguments,
                                                   argument_parse_result);
 
         result.children.push_back(argument_parse_result);
@@ -644,12 +644,13 @@ bool Lexer::parse_initialization(const std::vector<Token> &tokens,
          * initializer.
          */
         if (!success) {
-          std::cerr << "Line " << this->line_number
-                    << ": An error occurred while parsing the argument list of '"
-                    << tokens[0].value << "'." << std::endl;
+          this->system.print_error_message(
+              std::string(
+                  "An error occurred while parsing the argument list of '") +
+              tokens[0].value + "'.");
           std::cerr << "> Usage of '" << tokens[0].value
                     << "': " << tokens[0].value << "(";
-          System::print_argument_list(position_of_arguments->second);
+          System::print_argument_list(position_of_arguments->second.arguments);
           std::cerr << ")" << std::endl;
         }
 
@@ -660,21 +661,21 @@ bool Lexer::parse_initialization(const std::vector<Token> &tokens,
          */
         result.type = Error;
 
-        std::cerr << "Line " << this->line_number
-                  << ": Missing arguments during initialization of '"
-                  << tokens[0].value << "'." << std::endl;
+        this->system.print_error_message(
+            std::string("Missing arguments during initialization of '") +
+            tokens[0].value + "'.");
         std::cerr << "> Usage of '" << tokens[0].value
                   << "': " << tokens[0].value << "(";
-        System::print_argument_list(position_of_arguments->second);
+        System::print_argument_list(position_of_arguments->second.arguments);
         std::cerr << ")" << std::endl;
         return false;
       }
     }
   } else {
     result.type = Error;
-    std::cerr << "Line " << this->line_number << ": Invalid initialization: '"
-              << tokens[0].value << "' cannot be used to initialize a variable."
-              << std::endl;
+    this->system.print_error_message(
+        std::string("Invalid initialization: '") + tokens[0].value +
+        "' cannot be used to initialize a variable.");
     return false;
   }
 
@@ -697,17 +698,17 @@ bool Lexer::parse_number(const std::vector<Token> &tokens,
       return true;
     } else {
       result.type = Error;
-      std::cerr << "Line " << this->line_number << ": Invalid argument: '"
-                << tokens[0].value << "' could not be read as '"
-                << System::name_for_type.at(Number) << "'." << std::endl;
+      this->system.print_error_message(
+          std::string("Invalid argument: '") + tokens[0].value +
+          "' could not be read as '" + System::name_for_type.at(Number) + "'.");
       return false;
     }
   } else {
     result.type = Error;
-    std::cerr << "Line " << this->line_number
-              << ": Invalid number of arguments near '" << tokens[0].value
-              << "'. Token could not be read as '"
-              << System::name_for_type.at(Number) << "'." << std::endl;
+    this->system.print_error_message(
+        std::string("Invalid number of arguments near '") + tokens[0].value +
+        "'. Token could not be read as '" + System::name_for_type.at(Number) +
+        "'.");
     return false;
   }
 }
@@ -719,8 +720,7 @@ bool Lexer::parse_expression(const std::vector<Token> &tokens,
    */
   if (tokens.empty()) {
     result.type = Error;
-    std::cerr << "Line " << this->line_number
-              << ": Unexpectedly found empty expression." << std::endl;
+    this->system.print_error_message(std::string(": Unexpectedly found empty expression."));
     return false;
   }
 
@@ -742,8 +742,8 @@ bool Lexer::parse_expression(const std::vector<Token> &tokens,
       return parse_expression(tokens[0].children, result);
     } else {
       result.type = Error;
-      std::cerr << "Line " << this->line_number
-                << ": Invalid or empty expression." << std::endl;
+      this->system.print_error_message(
+          std::string("Invalid or empty expression."));
       return false;
     }
 
@@ -785,9 +785,8 @@ bool Lexer::parse_expression(const std::vector<Token> &tokens,
 
         } else {
           result.type = Error;
-          std::cerr << "Line " << this->line_number
-                    << ": Invalid syntax: Unexpectedly found operator."
-                    << std::endl;
+          this->system.print_error_message(
+              std::string("Invalid syntax: Unexpectedly found operator."));
           return false;
         }
       } else {
@@ -803,9 +802,9 @@ bool Lexer::parse_expression(const std::vector<Token> &tokens,
 
         } else {
           result.type = Error;
-          std::cerr << "Line " << this->line_number
-                    << ": Invalid syntax: Expected operator but found '"
-                    << tokens[index].value << "' instead." << std::endl;
+          this->system.print_error_message(
+              std::string("Invalid syntax: Expected operator but found '") +
+              tokens[index].value + "' instead.");
           return false;
         }
       }
@@ -817,8 +816,8 @@ bool Lexer::parse_expression(const std::vector<Token> &tokens,
     return true;
   } else {
     result.type = Error;
-    std::cerr << "Line " << this->line_number
-              << ": Invalid number of arguments in expression." << std::endl;
+    this->system.print_error_message(
+        std::string("Invalid number of arguments in expression."));
     return false;
   }
 }
@@ -846,22 +845,22 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
       /**
        * Get the arguments for the function.
        */
-      std::unordered_map<std::string, std::vector<std::string>>::const_iterator
+      std::unordered_map<std::string, Func>::const_iterator
         position_of_function_arguments =
-        System::arguments_for_functions.find(tokens[0].value);
+        this->system.known_functions.find(tokens[0].value);
 
       /**
        * Check whether we know this function.
        */
       if (position_of_function_arguments !=
-          System::arguments_for_functions.end()) {
+          this->system.known_functions.end()) {
 
           /**
            * Parse the functions argument list
            */
           ParseResult argument_parse_result;
           bool success = parse_argument_list(tokens[0].children,
-                              position_of_function_arguments->second,
+                              position_of_function_arguments->second.arguments,
                               argument_parse_result);
           result.children.push_back(argument_parse_result);
 
@@ -871,12 +870,13 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
            */
           if (!success) {
             result.type = Error;
-            std::cerr << "Line " << this->line_number
-                      << ": Invalid arguments in function call '" << tokens[0].value
-                      << "'." << std::endl;
+            this->system.print_error_message(
+                std::string("Invalid arguments in function call '") +
+                tokens[0].value + "'.");
             std::cerr << "> Usage of '" << tokens[0].value
                       << "': " << tokens[0].value << "(";
-            System::print_argument_list(position_of_function_arguments->second);
+            System::print_argument_list(
+                position_of_function_arguments->second.arguments);
             std::cerr << ")" << std::endl;
           }
 
@@ -886,24 +886,22 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
          * We don't know the function.
          */
         result.type = Error;
-        std::cerr << "Line " << this->line_number << ": Unknown function: '"
-                  << tokens[0].value << "'." << std::endl;
+        this->system.print_error_message(std::string("Unknown function: '") +
+                                         tokens[0].value + "'.");
         return false;
       }
     } else {
       result.type = Error;
-      std::cerr << "Line " << this->line_number
-                << ": Invalid syntax. Expected function name but found '"
-                << tokens[0].value << "', which is of type '"
-                << System::name_for_type.at(tokens[0].type) << std::endl;
+      this->system.print_error_message(
+          std::string("Invalid syntax. Expected function name but found '") +
+          tokens[0].value + "', which is of type '" +
+          System::name_for_type.at(tokens[0].type));
       return false;
     }
   } else {
     result.type = Error;
-    std::cerr << "Line " << this->line_number
-              << ": Invalid number of statements. Use only one function call "
-                 "per line."
-              << std::endl;
+    this->system.print_error_message(std::string(
+        "Invalid number of statements. Use only one function call per line."));
     return false;
   }
 
@@ -949,7 +947,8 @@ bool Lexer::parse_argument_list(
         /**
          * Check whether the argument matches the expected argument.
          */
-        if (tokens[token_index].value ==
+        std::string argument_name = tokens[token_index].value;
+        if (argument_name ==
             expected_arguments[number_of_found_arguments]) {
 
           /**
@@ -993,10 +992,9 @@ bool Lexer::parse_argument_list(
                    */
                   if (tokens[token_index].value == ":") {
                     result.type = Error;
-                    std::cerr << "Line " << this->line_number
-                              << ": Invalid syntax in function call. Expected "
-                                 "',' but found ':' instead."
-                              << std::endl;
+                    this->system.print_error_message(
+                        std::string("Invalid syntax in function call. Expected "
+                                    "',' but found ':' instead."));
                     return false;
                   }
 
@@ -1010,7 +1008,7 @@ bool Lexer::parse_argument_list(
                 /**
                  * We have now collected all values for this argument.  Parse them!
                  */
-                ParseResult argument_result(Argument, "");
+                ParseResult argument_result(Argument, argument_name);
 
                 /**
                  * Parse the argument value.
@@ -1046,40 +1044,38 @@ bool Lexer::parse_argument_list(
                 ++token_index;
               } else {
                 result.type = Error;
-                std::cerr << "Line " << this->line_number
-                          << ": Missing argument value in function call." << std::endl;
+                this->system.print_error_message(
+                    std::string("Missing argument value in function call."));
                 return false;
               }
             } else {
               result.type = Error;
-              std::cerr << "Line " << this->line_number
-                        << ": Invalid syntax in function call. Expected ':' "
-                           "but found '"
-                        << tokens[token_index].value << "' instead."
-                        << std::endl;
+              this->system.print_error_message(
+                  std::string("Invalid syntax in function call. Expected ':' "
+                              "but found '") +
+                  tokens[token_index].value + "' instead.");
               return false;
             }
 
           } else {
             result.type = Error;
-            std::cerr << "Line " << this->line_number
-                      << ": Missing argument value in function call." << std::endl;
+            this->system.print_error_message(
+                std::string("Missing argument value in function call."));
             return false;
           }
 
         } else {
           result.type = Error;
-          std::cerr << "Line " << this->line_number
-                    << ": Invalid argument in function call. Expected '"
-                    << expected_arguments[number_of_found_arguments]
-                    << "' but found '" << tokens[token_index].value
-                    << "' instead." << std::endl;
+          this->system.print_error_message(
+              std::string("Invalid argument in function call. Expected '") +
+              expected_arguments[number_of_found_arguments] + "' but found '" +
+              tokens[token_index].value + "' instead.");
           return false;
         }
       } else {
         result.type = Error;
-        std::cerr << "Line " << this->line_number
-                  << ": Extraneous argument in function call." << std::endl;
+        this->system.print_error_message(
+            std::string("Extraneous argument in function call."));
         return false;
       }
     }
@@ -1091,8 +1087,8 @@ bool Lexer::parse_argument_list(
     return true;
   } else {
     result.type = Error;
-    std::cerr << "Line " << this->line_number
-              << ": Missing argument in function call." << std::endl;
+    this->system.print_error_message(
+        std::string("Missing argument in function call."));
     return false;
   }
 }

@@ -51,11 +51,17 @@ int main(int argc, char *argv[]) {
    */
   FLAGS_logtostderr = 1;
 
-  hydra::Interpreter interpreter;
+  hydra::System system;
+  hydra::Lexer lexer(system);
+  hydra::Interpreter interpreter(system);
 
-  hydra::Lexer lexer;
-  std::string command = "let o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
-  // std::string command = "let a = 5.0";
+  std::string command =
+      "var o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
+
+  system.state.current_line = command;
+  system.state.line_number = 1;
+
+  // std::string command = "var a = 5.0";
   // std::string command = "for r in [0.0, 0.1, 10.0]";
 
   std::vector<hydra::Token> tokens;

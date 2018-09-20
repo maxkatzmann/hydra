@@ -61,9 +61,14 @@ struct ParseResult {
 
 class Lexer {
  public:
-  int line_number = 0;
 
-  Lexer() {}
+  Lexer(System &system);
+
+  /**
+   * The system knows about which functions and types are available,
+   * which is important to know while parsing.
+   */
+  System &system;
 
   /**
    * Determines the components in a string separated by the passed
