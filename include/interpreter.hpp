@@ -15,6 +15,7 @@
 #define interpreter_hpp
 
 #include <any>
+#include <functional>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -27,9 +28,34 @@ namespace hydra {
   class Interpreter {
   public:
 
+    /**
+     * Constructor
+     */
     Interpreter(System &system);
 
+    /**
+     * The system knows about types and keywords, and additionally
+     * knows holds the scopes, which the interpreter needs in order to
+     * evaluate variables, etc.
+     */
     System &system;
+
+    /**
+     * Maps a Type (e.g. Assignment) to the function that is
+     * responsible for interpreting ParseResults of this type.
+     */
+    std::unordered_map<
+        Type,
+        std::function<bool(Interpreter *, const ParseResult &, std::any &)>>
+        known_interpretations;
+
+    /**
+     * Maps the function names to the corresponding implementation.
+     */
+    std::unordered_map<
+        std::string,
+        std::function<bool(Interpreter *, const ParseResult &, std::any &)>>
+        builtin_functions;
 
     /**
      * Determines the value for a variable and stores the result in
@@ -37,6 +63,12 @@ namespace hydra {
      * returns false and value.has_value() returns false.
      */
     bool value_for_variable(const std::string &variable, std::any &value);
+
+    /**
+     * Tries to cast a value to double. Returns false if the cast
+     * failed.
+     */
+    bool number_from_value(const std::any &value, double &number);
 
     /**
      * Determines the value for a variable in the current scope and
@@ -73,6 +105,20 @@ namespace hydra {
     bool interpret_initialization(const ParseResult &input, std::any &result);
 
     /**
+     * Interprets a mathematical expression.  Returns false if an
+     * error occurred during interpretation.  The result contains the
+     * value of the interpretation.
+     */
+    bool interpret_expression(const ParseResult &input, std::any &result);
+
+    /**
+     * Interprets a function.  Returns false if an
+     * error occurred during interpretation.  The result contains the
+     * value of the interpretation.
+     */
+    bool interpret_function(const ParseResult &function_call, std::any &result);
+
+    /**
      * Interprets a number.  Returns false if an error occurred during
      * interpretation.  The result contains the value of the
      * interpretation.
@@ -80,11 +126,87 @@ namespace hydra {
     bool interpret_number(const ParseResult &input, std::any &result);
 
     /**
+     * Interprets a string.  Returns false if an error occurred during
+     * interpretation.  The result contains the value of the
+     * interpretation.
+     */
+    bool interpret_string(const ParseResult &input, std::any &result);
+
+    /**
+     * Interprets a ParseResult of unknown type.  Returns false if an
+     * error occurred during interpretation.  The result contains the
+     * value of the interpretation.
+     */
+    bool interpret_unknown(const ParseResult &input, std::any &result);
+
+    /**
      * Tries to interpret a variable.  Returns false if an error
      * occurred during interpretation.  The result contains the value
      * of the interpretation.
      */
     bool interpret_variable(const ParseResult &input, std::any &result);
+
+    // Functions:
+
+    /**
+     * Given a complete function call, tries to interpret the
+     * arguments.
+     *
+     * Since some functions cannot interpret all arguments at once,
+     * the parameters_to_interpret vector can by used to define which
+     * arguments should be interpreted. By default the
+     * parameters_to_interpret vector is empty, indicating that all
+     * arguments should be interpreted.
+     */
+    bool interpret_arguments_from_function_call(
+        const ParseResult &function_call,
+        std::unordered_map<std::string, std::any> &arguments,
+        const std::vector<std::string> &parameters_to_interpret = {});
+
+    /**
+     * Given an interpreted argument list, tries to determine the value
+     * for the passed parameter name.  Returns false if the argument
+     * value could not be obtained.  If successful, returns true and
+     * passes the result to value.
+     */
+    bool argument_value_for_parameter(
+        const std::string &parameter,
+        const std::unordered_map<std::string, std::any> &interpreted_arguments,
+        std::any &result);
+
+    /**
+     * Given an interpreted argument list, tries to determine the
+     * numerical value for the passed parameter name.  Returns false,
+     * if the value could not be obtained.  If successful, returns true and
+     * passes the result to value.
+     */
+    bool number_value_for_parameter(
+        const std::string &parameter,
+        const std::unordered_map<std::string, std::any> &interpreted_arguments,
+        double &value);
+
+    /**
+     * Given an interpreted argument list, tries to determine the
+     * numerical value for the passed parameter name.  Returns false,
+     * if the value could not be obtained.  If successful, returns true and
+     * passes the result to value.
+     */
+    bool string_value_for_parameter(
+        const std::string &parameter,
+        const std::unordered_map<std::string, std::any> &interpreted_arguments,
+        std::string &str);
+
+    /**
+     * The implementation of these functions can be found in
+     * interpreter_functions.cpp
+     */
+    bool function_cos(const ParseResult &function_call, std::any &result);
+    bool function_cosh(const ParseResult &function_call, std::any &result);
+    bool function_exp(const ParseResult &function_call, std::any &result);
+    bool function_print(const ParseResult &function_call, std::any &result);
+    bool function_random(const ParseResult &function_call, std::any &result);
+    bool function_sin(const ParseResult &function_call, std::any &result);
+    bool function_sinh(const ParseResult &function_call, std::any &result);
 
     /**
      * Tries to find out what type the result is and cast it in order

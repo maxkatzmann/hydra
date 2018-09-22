@@ -27,6 +27,7 @@ const std::unordered_map<Type, std::string, std::hash<int>>
         {Number, "Number"},
         {Operator, "Operator"},
         {Range, "Range"},
+        {String, "String"},
         {Unknown, "Unknown"},
         {Variable, "Variable"}};
 
@@ -34,6 +35,7 @@ System::System() {
 
   this->types_for_keywords = {{"arc", Function},
                               {"circle", Function},
+                              {"clear", Function},
                               {"cos", Function},
                               {"cosh", Function},
                               {"curve_angle", Function},
@@ -45,6 +47,7 @@ System::System() {
                               {"line", Function},
                               {"Pol", Initialization},
                               {"point", Function},
+                              {"print", Function},
                               {"random", Function},
                               {"save", Function},
                               {"sin", Function},
@@ -63,6 +66,7 @@ System::System() {
    */
   this->known_functions = {{"arc", Func("arc", {"center", "radius", "from", "to"})},
                            {"circle", Func("circle", {"center", "radius"})},
+                           {"clear", Func("clear", {})},
                            {"cos", Func("cos", {"x"})},
                            {"cosh", Func("cosh", {"x"})},
                            {"curve_angle", Func("curve_angle", {"from", "to", "angle"})},
@@ -72,6 +76,7 @@ System::System() {
                            {"line", Func("line", {"from", "to"})},
                            {"point", Func("point", {"center", "radius"})},
                            {"Pol", Func("Pol", {"r", "phi"})},
+                           {"print", Func("print", {"message"})},
                            {"random", Func("random", {"from", "to"})},
                            {"save", Func("save", {})},
                            {"sin", Func("sin", {"x"})},

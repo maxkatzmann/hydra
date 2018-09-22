@@ -61,10 +61,8 @@ int main(int argc, char *argv[]) {
   //     "var o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
 
   std::vector<std::string> code = {
-      "var a = 5.0 // Declaring a variable",
-      "a = 3.14 // Assigning a new value",
-      "var b = 2",
-      "b = a // Assigning the value of another variable"};
+                                   "print(message: \"Bow to the mighty Hydra!\n\")"
+  };
 
   std::cout << "Interpreting code: " << std::endl << std::endl;
   for (int line = 0; line < (int)code.size(); ++line) {
@@ -87,6 +85,8 @@ int main(int argc, char *argv[]) {
     if (!success) {
       std::cerr << "Could not parse command." << std::endl;
     }
+
+    hydra::Lexer::print_parse_result(command_parse_result);
 
     std::any interpretation_result;
 

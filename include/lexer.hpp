@@ -14,6 +14,7 @@
 #ifndef lexer_hpp
 #define lexer_hpp
 
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -71,6 +72,14 @@ class Lexer {
   System &system;
 
   /**
+   * Maps to each type the corresponding parser function.
+   */
+  std::unordered_map<
+      Type,
+      std::function<bool(Lexer *, const std::vector<Token> &, ParseResult &)>>
+      known_parsers;
+
+  /**
    * Determines the components in a string separated by the passed
    * delimiters.
    */
@@ -85,12 +94,25 @@ class Lexer {
   static void clean_string(std::string &str);
 
   /**
+   * Determines whether a string consists of white spaces only.
+   */
+  static bool is_string_empty(std::string &str);
+
+  /**
    * Finds the matching bracket to the one specified at position and
    * returns its index.  If the matching bracket was not found,
    * std::string::npos is returned.
    */
   static int position_of_matching_bracket_for_position(const std::string &str,
                                                        int position);
+
+  /**
+   * Finds the matching '"' to the one at the specified position and
+   * returns its index.  If the matching quote was not found,
+   * std::string::npos is returned.
+   */
+  static int position_of_matching_quote_for_position(const std::string &str,
+                                                     int position);
 
   /**
    * Determines the tokens in a string.
@@ -119,21 +141,16 @@ class Lexer {
   bool parse_tokens(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
+   * Parses the parameter list of a function call or initialization.
+   */
+  bool parse_argument_list(const std::vector<Token> &tokens,
+                           const std::vector<std::string> &expected_arguments,
+                           ParseResult &result);
+
+  /**
    * Parses a string that represents an assignment.
    */
   bool parse_assignment(const std::vector<Token> &tokens, ParseResult &result);
-
-  /**
-   * Parses a string that represents an initialization.  If the parsed string
-   * is not an initialization, the result will have type Error.
-   */
-  bool parse_initialization(const std::vector<Token> &tokens, ParseResult &result);
-
-  /**
-   * Parses a string that represents a number.  If the parsed string
-   * is not a number, the result will have type Error.
-   */
-  bool parse_number(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents an expression.  If the parsed
@@ -148,11 +165,21 @@ class Lexer {
   bool parse_function(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
-   * Parses the parameter list of a function call or initialization.
+   * Parses a string that represents an initialization.  If the parsed string
+   * is not an initialization, the result will have type Error.
    */
-  bool parse_argument_list(const std::vector<Token> &tokens,
-                           const std::vector<std::string> &expected_arguments,
-                           ParseResult &result);
+  bool parse_initialization(const std::vector<Token> &tokens, ParseResult &result);
+
+  /**
+   * Parses a string that represents a number.  If the parsed string
+   * is not a number, the result will have type Error.
+   */
+  bool parse_number(const std::vector<Token> &tokens, ParseResult &result);
+
+  /**
+   * Parses a string that represents a string.
+   */
+  bool parse_string_token(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Recursively prints the passed parse result.

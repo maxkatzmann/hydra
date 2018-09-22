@@ -12,7 +12,17 @@
 
 namespace hydra {
 
-  Lexer::Lexer(System &system) : system(system) {}
+Lexer::Lexer(System &system) : system(system) {
+
+  this->known_parsers = {
+      {Assignment, &Lexer::parse_assignment},
+      {Expression, &Lexer::parse_expression},
+      {Function, &Lexer::parse_function},
+      {Initialization, &Lexer::parse_initialization},
+      {Number, &Lexer::parse_number},
+      {String, &Lexer::parse_string_token}
+  };
+}
 
 void Lexer::components_in_string(const std::string &str,
                                 std::vector<std::string> &components,
@@ -92,11 +102,15 @@ void Lexer::clean_string(std::string &str) {
   }
 }
 
+bool Lexer::is_string_empty(std::string &str) {
+  return str.empty() || str.find_first_not_of(" \t", 0) == std::string::npos;
+}
+
 int Lexer::position_of_matching_bracket_for_position(const std::string &str,
                                                      int position) {
   const char opening_bracket = str[position];
 
-  const std::unordered_map<char, char> bracket_pairs = {{'(', ')'}, {'[', ']'}, {'{', '}'}};
+  const std::unordered_map<char, char> bracket_pairs = {{'(', ')'}, {'[', ']'}, {'{', '}'}, {'"', '"'}};
 
   const char closing_bracket = bracket_pairs.at(opening_bracket);
 
@@ -105,12 +119,19 @@ int Lexer::position_of_matching_bracket_for_position(const std::string &str,
    * bracket.
    */
   int position_of_closing_bracket = -1;
-  int number_of_open_brackets = 0;
 
   /**
-   * Iterate the characters in the string to find the matching closing bracket.
+   * The first bracket is already open, since is the one we just
+   * found.
    */
-  for (int string_index = position; string_index < (int)str.length();
+  int number_of_open_brackets = 1;
+
+  /**
+   * Iterate the characters in the string to find the matching closing
+   * bracket. Obviously, we don't need to check the position itself,
+   * so we start at the next position instead.
+   */
+  for (int string_index = position + 1; string_index < (int)str.length();
        ++string_index) {
 
     /**
@@ -138,6 +159,28 @@ int Lexer::position_of_matching_bracket_for_position(const std::string &str,
   return position_of_closing_bracket;
 }
 
+int Lexer::position_of_matching_quote_for_position(const std::string &str,
+                                                     int position) {
+
+  /**
+   * Iterate the characters in the string to find the matching closing
+   * bracket. Obviously, we don't need to check the position itself,
+   * so we start at the next position instead.
+   */
+  for (int string_index = position + 1; string_index < (int)str.length();
+       ++string_index) {
+
+    /**
+     * Dealing open brackets.
+     */
+    if (str[string_index] == '"') {
+      return string_index;
+    }
+  }
+
+  return (int)std::string::npos;
+}
+
 bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) {
 
   std::string cleaned_string = str;
@@ -161,7 +204,6 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
      */
     if (cleaned_string[current_index] == '(' ||
         cleaned_string[current_index] == '[') {
-
       /**
        * Find the matching bracket.
        */
@@ -229,20 +271,38 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
        * them as children of the last token.
        */
       Lexer::tokenize_string(
-                             cleaned_string.substr(current_index + 1,
-                                                   matching_bracket - (current_index + 1)),
-                             tokens.back().children);
-
-      /**
-       * Tokenize the content of the bracket as children of the token
-       * we just created.
-       */
+          cleaned_string.substr(current_index + 1,
+                                matching_bracket - (current_index + 1)),
+          tokens.back().children);
 
       /**
        * We already tokenized the contents of in the bracket, so we
        * now continue with the contents after the bracket.
        */
       current_index = matching_bracket + 1;
+
+    } else if (cleaned_string[current_index] == '"') {
+      /**
+       * If we're dealing with a string, we identify the whole string
+       * and save it as token.
+       */
+      int matching_quote = Lexer::position_of_matching_quote_for_position(
+          cleaned_string, current_index);
+      Token string_token(
+          cleaned_string.substr(current_index + 1,
+                                matching_quote - (current_index + 1)),
+          String);
+
+      /**
+       * Add the string token.
+       */
+      tokens.push_back(string_token);
+
+      /**
+       * We already tokenized the whole string, so we now continue
+       * with the contents after the quote.
+       */
+      current_index = matching_quote + 1;
     }
 
     /**
@@ -292,12 +352,11 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
      */
     current_index = position_of_next_separator;
 
-
     /**
      * Add the token, but only if either the token has a value or has
      * children.
      */
-    if (!token.value.empty() || !token.children.empty()) {
+    if (!Lexer::is_string_empty(token.value) || !token.children.empty()) {
       tokens.push_back(token);
     }
 
@@ -439,21 +498,20 @@ bool Lexer::parse_tokens(const std::vector<Token> &tokens,
   Type type = type_of_tokenized_string(tokens);
 
   /**
-   * Parse the tokenized string depending on the type.
+   * Find the parser that should be used for a tokenized string of
+   * that type.
    */
-  switch (type) {
-  case Assignment:
-    return parse_assignment(tokens, result);
-  case Expression:
-    return parse_expression(tokens, result);
-  case Function:
-    return parse_function(tokens, result);
-  case Initialization:
-    return parse_initialization(tokens, result);
-  case Number:
-    return parse_number(tokens, result);
-  default:
+  std::unordered_map<Type,
+                     std::function<bool(Lexer *, const std::vector<Token> &,
+                                        ParseResult &)>>::const_iterator
+      position_of_parser = this->known_parsers.find(type);
 
+  if (position_of_parser != this->known_parsers.end()) {
+    /**
+     * Call the found parser function.
+     */
+    return position_of_parser->second(this, tokens, result);
+  } else {
     /**
      * We don't know what to do with that. Maybe its a variable name?
      * If we're dealing with a single token this might be the
@@ -924,6 +982,34 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
    * If we didn't return, yet, something went wrong.
    */
   return false;
+}
+
+bool Lexer::parse_string_token(const std::vector<Token> &tokens,
+                               ParseResult &result) {
+
+  /**
+   * A string token has to consist of exactly one token. Which
+   * contains the string.
+   */
+  if (tokens.size() == 1) {
+    if (tokens[0].type == String) {
+      result.type = String;
+      result.value = tokens[0].value;
+      return true;
+    } else {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Unexpectedly found '") +
+          System::name_for_type.at(tokens[0].type) +
+          "' while trying to parse a string.");
+      return false;
+    }
+  } else {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid number of argument in string."));
+    return false;
+  }
 }
 
 bool Lexer::parse_argument_list(

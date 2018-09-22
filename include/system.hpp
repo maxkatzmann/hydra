@@ -36,8 +36,9 @@ enum Type {
   Number = 9,
   Operator = 10,
   Range = 11,
-  Unknown = 12,
-  Variable = 13
+  String = 12,
+  Unknown = 13,
+  Variable = 14
 };
 
 /**
