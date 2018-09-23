@@ -176,92 +176,87 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
      * A new assignment consists of exactly 3 values:
      * var variable (=) value
      */
-    if (input.children.size() == 3) {
-      /**
-       * The second parse result must be a variable name.
-       */
-      if (input.children[1].type == Variable) {
-
-        /**
-         * The variable name must not be empty.
-         */
-        if (!input.children[1].value.empty()) {
-          /**
-           * Variable assignments must not start with an
-           * '_'. Underscores are reserved for internal variables.
-           */
-          if (input.children[1].value[0] != '_') {
-            /**
-             * First check whether the variable is not yet written.
-             */
-            std::any already_defined_value;
-            value_for_variable_in_current_scope(input.children[1].value,
-                                                already_defined_value);
-
-            /**
-             * Make sure the variable is not defined already.
-             */
-            if (!already_defined_value.has_value()) {
-              /**
-               * The value is not defined yet. Now we have to interpret
-               * what is being assigned.
-               */
-              std::any value_interpretation_result;
-
-              /**
-               * Check whether the value was interpreted successfully.
-               */
-              if (interpret_parse_result(input.children[2],
-                                         value_interpretation_result)) {
-                DLOG(INFO) << "Assignment value interpreted successfully."
-                           << std::endl;
-
-                /**
-                 * Check whether we actually got a value from the
-                 * interpretation.
-                 */
-                if (value_interpretation_result.has_value()) {
-                  /**
-                   * Finish the assignment by adding the variable to the
-                   * current scope.
-                   */
-                  this->system.state.scopes.back()[input.children[1].value] =
-                      value_interpretation_result;
-                  result = value_interpretation_result;
-                  return true;
-                }
-              }
-            } else {
-              this->system.print_error_message(
-                  std::string("Redefinition of : '") +
-                  input.children[1].value + "'.");
-              return false;
-            }
-          } else {
-            this->system.print_error_message(
-                std::string("Invalid assignment. Variables starting with '_' "
-                            "cannot be assigned to."));
-            return false;
-          }
-
-        } else {
-          this->system.print_error_message(
-              std::string("Invalid assignment: The variable name must not be "
-                          "empty. Use 'var a = 5.0' instead."));
-          return false;
-        }
-      } else {
-        this->system.print_error_message(
-            std::string("Invalid assignment. Use 'var a = 5.0' instead."));
-        return false;
-      }
-    } else {
+    if (input.children.size() != 3) {
       this->system.print_error_message(
           std::string("Invalid assignment. Use 'var a = 5.0' instead."));
       return false;
     }
-  } else {
 
+    /**
+     * The second parse result must be a variable name.
+     */
+    if (input.children[1].type != Variable) {
+      this->system.print_error_message(
+          std::string("Invalid assignment. Use 'var a = 5.0' instead."));
+      return false;
+    }
+
+    /**
+     * The variable name must not be empty.
+     */
+    if (input.children[1].value.empty()) {
+      this->system.print_error_message(
+          std::string("Invalid assignment: The variable name must not be "
+                      "empty. Use 'var a = 5.0' instead."));
+      return false;
+    }
+
+    /**
+     * Variable assignments must not start with an
+     * '_'. Underscores are reserved for internal variables.
+     */
+    if (input.children[1].value[0] == '_') {
+      this->system.print_error_message(
+          std::string("Invalid assignment. Variables starting with '_' "
+                      "cannot be assigned to."));
+      return false;
+    }
+
+    /**
+     * First check whether the variable is not yet written.
+     */
+    std::any already_defined_value;
+    value_for_variable_in_current_scope(input.children[1].value,
+                                        already_defined_value);
+
+    /**
+     * Make sure the variable is not defined already.
+     */
+    if (already_defined_value.has_value()) {
+      this->system.print_error_message(std::string("Redefinition of : '") +
+                                       input.children[1].value + "'.");
+      return false;
+    }
+
+    /**
+     * The value is not defined yet. Now we have to interpret
+     * what is being assigned.
+     */
+    std::any value_interpretation_result;
+
+    /**
+     * Check whether the value was interpreted successfully.
+     */
+    if (interpret_parse_result(input.children[2],
+                               value_interpretation_result)) {
+      DLOG(INFO) << "Assignment value interpreted successfully." << std::endl;
+
+      /**
+       * Check whether we actually got a value from the
+       * interpretation.
+       */
+      if (value_interpretation_result.has_value()) {
+        /**
+         * Finish the assignment by adding the variable to the
+         * current scope.
+         */
+        this->system.state.scopes.back()[input.children[1].value] =
+            value_interpretation_result;
+        result = value_interpretation_result;
+        return true;
+      }
+    }
+  } else {
     /**
      * Version 2 (without 'var'):
      */
@@ -270,57 +265,54 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
      * The assignment should consist of exactly two values: the name
      * of the variable and whatever is being assigned to it.
      */
-    if (input.children.size() == 2) {
-
-      /**
-       * We now check whether the variable is already defined.
-       */
-      std::any current_value;
-      this->value_for_variable(input.children[0].value, current_value);
-
-      if (current_value.has_value()) {
-        /**
-         * The variable was declared before. Now we have to interpret
-         * what is being assigned.
-         */
-        std::any value_interpretation_result;
-
-        /**
-         * Check whether the value was interpreted successfully.
-         */
-        if (interpret_parse_result(input.children[1],
-                                   value_interpretation_result)) {
-          DLOG(INFO) << "Assignment value interpreted successfully."
-                     << std::endl;
-
-          /**
-           * Check whether we actually got a value from the
-           * interpretation.
-           */
-          if (value_interpretation_result.has_value()) {
-            /**
-             * Finish the assignment by adding the variable to the
-             * current scope.
-             */
-            this->system.state.scopes.back()[input.children[0].value] =
-                value_interpretation_result;
-            result = value_interpretation_result;
-            return true;
-          }
-        }
-      } else {
-        this->system.print_error_message(
-            std::string(
-                "Trying to assign to undefined variable. Define the variable "
-                "first using 'var ") +
-            input.children[0].value + " = ...' instead.");
-        return false;
-      }
-
-    } else {
+    if (input.children.size() != 2) {
       this->system.print_error_message(
           std::string("Invalid assignment. Use 'var a = 5.0' instead."));
       return false;
+    }
+
+    /**
+     * We now check whether the variable is already defined.
+     */
+    std::any current_value;
+    this->value_for_variable(input.children[0].value, current_value);
+
+    if (!current_value.has_value()) {
+      this->system.print_error_message(
+          std::string(
+              "Trying to assign to undefined variable. Define the variable "
+              "first using 'var ") +
+          input.children[0].value + " = ...' instead.");
+      return false;
+    }
+
+    /**
+     * The variable was declared before. Now we have to interpret
+     * what is being assigned.
+     */
+    std::any value_interpretation_result;
+
+    /**
+     * Check whether the value was interpreted successfully.
+     */
+    if (interpret_parse_result(input.children[1],
+                               value_interpretation_result)) {
+      DLOG(INFO) << "Assignment value interpreted successfully." << std::endl;
+
+      /**
+       * Check whether we actually got a value from the
+       * interpretation.
+       */
+      if (value_interpretation_result.has_value()) {
+        /**
+         * Finish the assignment by adding the variable to the
+         * current scope.
+         */
+        this->system.state.scopes.back()[input.children[0].value] =
+            value_interpretation_result;
+        result = value_interpretation_result;
+        return true;
+      }
     }
   }
 
@@ -384,16 +376,16 @@ bool Interpreter::interpret_string(const ParseResult &input, std::any &result) {
   /**
    * Reset the result so the check for has_value fails.
    */
-  if (input.type == String) {
-    result = input.value;
-    return true;
-  } else {
+  if (input.type != String) {
     this->system.print_error_message(
         std::string("Interpretation failed. Unexpectedly found '") +
         System::name_for_type.at(input.type) +
         "' while interpreting a string.");
     return false;
   }
+
+  result = input.value;
+  return true;
 }
 
 bool Interpreter::interpret_unknown(const ParseResult &input,
@@ -402,17 +394,7 @@ bool Interpreter::interpret_unknown(const ParseResult &input,
    * If the input type is unknown we check whether it might be a
    * variable.  (The lexer doesn't know about the defined variables.)
    */
-  if (input.type == Unknown) {
-    /**
-     * If the type is unknown we assume that its a variable. This
-     * only works, if the input has no children.
-     */
-    if (input.children.empty()) {
-      return interpret_variable(input, result);
-    } else {
-      return false;
-    }
-  } else {
+  if (input.type != Unknown) {
     /**
      * If the input type is not unknown something is wrong.
      */
@@ -422,6 +404,16 @@ bool Interpreter::interpret_unknown(const ParseResult &input,
         "' while interpreting something unknown.");
     return false;
   }
+
+  /**
+   * If the type is unknown we assume that its a variable. This
+   * only works, if the input has no children.
+   */
+  if (!input.children.empty()) {
+    return false;
+  }
+
+  return interpret_variable(input, result);
 }
 
 bool Interpreter::interpret_expression(const ParseResult &input,
@@ -476,177 +468,175 @@ bool Interpreter::interpret_expression(const ParseResult &input,
        * Check if the operator is at an odd index. Otherwise something
        * is wrong.
        */
-      if (index % 2 == 1) {
-
-        /**
-         * The string representing the current operator.
-         */
-        std::string operator_string = input.children[index].value;
-
-        /**
-         * Check whether the operator is '*' or '/'
-         */
-        if ("*" == operator_string || "/" == operator_string) {
-          /**
-           * We now evaluate the operation.  For this, we evaluate the
-           * preceding and following part of the expression.
-           *
-           * Start with the left hand side.
-           */
-          std::any lhs_result;
-
-          /**
-           * We now use the last element of the REMAINING_EXPRESSION
-           * as left hand side. This is due to the following
-           * reason. In the previous iteration we added the previous
-           * element of the expression to the end of the
-           * remaining_expression vector. We now use it and then pop
-           * it from the remaining_expression since we won't evaluate
-           * it again.
-           *
-           * If the previous element was already a right hand side of
-           * a multiplication or division, this right hand side was
-           * already evaluated and the result of the multiplication or
-           * division was added to the back of the
-           * remaining_expression vector. Which means now taking this
-           * element from the end is exactly what we want.
-           */
-          bool lhs_interpretation_success =
-              interpret_parse_result(remaining_expression.back(), lhs_result);
-
-          /**
-           * We don't want to interpret this element again.
-           */
-          remaining_expression.pop_back();
-
-          /**
-           * Check whether the left hand side was evaluated
-           * successfully.
-           */
-          if (!lhs_interpretation_success) {
-            this->system.print_error_message(
-                std::string(
-                    "Could not interpret left hand side of operation near '") +
-                operator_string + "'.");
-            return false;
-          }
-
-          /**
-           * We now try to get the numerical value of the left hand
-           * side.  Operators can only be applied to numbers. So we
-           * try to cast the result to a number.
-           */
-          double lhs_value;
-
-          try {
-            lhs_value = std::any_cast<double>(lhs_result);
-          } catch (const std::bad_any_cast &bac) {
-            this->system.print_error_message(
-                std::string("Interpretation failed: Left hand side of "
-                            "operation near '") +
-                operator_string +
-                "', could not be interpreted as number :" + bac.what());
-            return false;
-          }
-
-          /**
-           * Now proceed with the right hand side.
-           */
-
-          std::any rhs_result;
-          bool rhs_interpretation_success =
-              interpret_parse_result(input.children[index + 1], rhs_result);
-
-          /**
-           * Check whether the left hand side was evaluated
-           * successfully.
-           */
-          if (!rhs_interpretation_success) {
-            this->system.print_error_message(
-                std::string(
-                    "Could not interpret right hand side of operation near '") +
-                operator_string + "'.");
-            return false;
-          }
-
-          /**
-           * We now try to get the numerical value of the left hand
-           * side.  Operators can only be applied to numbers. So we
-           * try to cast the result to a number.
-           */
-          double rhs_value;
-
-          try {
-            rhs_value = std::any_cast<double>(rhs_result);
-          } catch (const std::bad_any_cast &bac) {
-            this->system.print_error_message(
-                std::string("Interpretation failed: Right hand side of "
-                            "operation near '") +
-                operator_string +
-                "', could not be interpreted as number :" + bac.what());
-            return false;
-          }
-
-          /**
-           * Now we have the left hand side and the right hand
-           * side. So we can actually evaluate the expression.
-           */
-          double result_value;
-
-          /**
-           * Perform multiplications
-           */
-          if ("*" == operator_string) {
-            result_value = lhs_value * rhs_value;
-            DLOG(INFO) << "Intermediate result of expression: " << lhs_value
-                       << " * " << rhs_value << " = " << result_value;
-          } else {
-            result_value = lhs_value / rhs_value;
-
-            DLOG(INFO) << "Intermediate result of expression: " << lhs_value
-                       << " / " << rhs_value << " = " << result_value;
-          }
-
-          /**
-           * Since we later need to evaluate the whole expression, we
-           * now add this intermediate result as ParseResult so later
-           * evaluation becomes easier.
-           */
-          ParseResult intermediate_result(Number, std::to_string(result_value));
-
-          /**
-           * We now simply add the result at the end of the
-           * remaining_expression in order to be evaluated later.
-           */
-          remaining_expression.push_back(intermediate_result);
-
-          /**
-           * Now we're done with the evaluation. Since we don't need
-           * to consider the right side of this operation again, we
-           * skip this element by increasing the current index by two
-           * instead of one.
-           */
-          index += 2;
-
-          /**
-           * Skip the remainder of the loop.
-           */
-          continue;
-
-        } else {
-          /**
-           * If the operator is not '*' or '/', we add it to the
-           * remaining_expression.
-           */
-          remaining_expression.push_back(input.children[index]);
-        }
-      } else {
+      if (index % 2 != 1) {
         this->system.print_error_message(
             std::string("Unexpected operator found at an even index in the "
                         "expression."));
         return false;
       }
 
+      /**
+       * The string representing the current operator.
+       */
+      std::string operator_string = input.children[index].value;
+
+      /**
+       * Check whether the operator is '*' or '/'
+       */
+      if ("*" == operator_string || "/" == operator_string) {
+        /**
+         * We now evaluate the operation.  For this, we evaluate the
+         * preceding and following part of the expression.
+         *
+         * Start with the left hand side.
+         */
+        std::any lhs_result;
+
+        /**
+         * We now use the last element of the REMAINING_EXPRESSION
+         * as left hand side. This is due to the following
+         * reason. In the previous iteration we added the previous
+         * element of the expression to the end of the
+         * remaining_expression vector. We now use it and then pop
+         * it from the remaining_expression since we won't evaluate
+         * it again.
+         *
+         * If the previous element was already a right hand side of
+         * a multiplication or division, this right hand side was
+         * already evaluated and the result of the multiplication or
+         * division was added to the back of the
+         * remaining_expression vector. Which means now taking this
+         * element from the end is exactly what we want.
+         */
+        bool lhs_interpretation_success =
+            interpret_parse_result(remaining_expression.back(), lhs_result);
+
+        /**
+         * We don't want to interpret this element again.
+         */
+        remaining_expression.pop_back();
+
+        /**
+         * Check whether the left hand side was evaluated
+         * successfully.
+         */
+        if (!lhs_interpretation_success) {
+          this->system.print_error_message(
+              std::string(
+                  "Could not interpret left hand side of operation near '") +
+              operator_string + "'.");
+          return false;
+        }
+
+        /**
+         * We now try to get the numerical value of the left hand
+         * side.  Operators can only be applied to numbers. So we
+         * try to cast the result to a number.
+         */
+        double lhs_value;
+
+        try {
+          lhs_value = std::any_cast<double>(lhs_result);
+        } catch (const std::bad_any_cast &bac) {
+          this->system.print_error_message(
+              std::string("Interpretation failed: Left hand side of "
+                          "operation near '") +
+              operator_string +
+              "', could not be interpreted as number :" + bac.what());
+          return false;
+        }
+
+        /**
+         * Now proceed with the right hand side.
+         */
+
+        std::any rhs_result;
+        bool rhs_interpretation_success =
+            interpret_parse_result(input.children[index + 1], rhs_result);
+
+        /**
+         * Check whether the left hand side was evaluated
+         * successfully.
+         */
+        if (!rhs_interpretation_success) {
+          this->system.print_error_message(
+              std::string(
+                  "Could not interpret right hand side of operation near '") +
+              operator_string + "'.");
+          return false;
+        }
+
+        /**
+         * We now try to get the numerical value of the left hand
+         * side.  Operators can only be applied to numbers. So we
+         * try to cast the result to a number.
+         */
+        double rhs_value;
+
+        try {
+          rhs_value = std::any_cast<double>(rhs_result);
+        } catch (const std::bad_any_cast &bac) {
+          this->system.print_error_message(
+              std::string("Interpretation failed: Right hand side of "
+                          "operation near '") +
+              operator_string +
+              "', could not be interpreted as number :" + bac.what());
+          return false;
+        }
+
+        /**
+         * Now we have the left hand side and the right hand
+         * side. So we can actually evaluate the expression.
+         */
+        double result_value;
+
+        /**
+         * Perform multiplications
+         */
+        if ("*" == operator_string) {
+          result_value = lhs_value * rhs_value;
+          DLOG(INFO) << "Intermediate result of expression: " << lhs_value
+                     << " * " << rhs_value << " = " << result_value;
+        } else {
+          result_value = lhs_value / rhs_value;
+
+          DLOG(INFO) << "Intermediate result of expression: " << lhs_value
+                     << " / " << rhs_value << " = " << result_value;
+        }
+
+        /**
+         * Since we later need to evaluate the whole expression, we
+         * now add this intermediate result as ParseResult so later
+         * evaluation becomes easier.
+         */
+        ParseResult intermediate_result(Number, std::to_string(result_value));
+
+        /**
+         * We now simply add the result at the end of the
+         * remaining_expression in order to be evaluated later.
+         */
+        remaining_expression.push_back(intermediate_result);
+
+        /**
+         * Now we're done with the evaluation. Since we don't need
+         * to consider the right side of this operation again, we
+         * skip this element by increasing the current index by two
+         * instead of one.
+         */
+        index += 2;
+
+        /**
+         * Skip the remainder of the loop.
+         */
+        continue;
+
+      } else {
+        /**
+         * If the operator is not '*' or '/', we add it to the
+         * remaining_expression.
+         */
+        remaining_expression.push_back(input.children[index]);
+      }
     } else {
       /**
        * If we don't have an operator, we simply add the part of the
@@ -783,20 +773,19 @@ bool Interpreter::interpret_expression(const ParseResult &input,
         /**
          * If the index is odd, we expect an operator.
          */
-        if (remaining_expression[index].type == Operator) {
-
-          /**
-           * Update the current operation.
-           */
-          current_operation = remaining_expression[index].value;
-          DLOG(INFO) << "Operation updated for index " << index << ": '"
-                     << current_operation << "'." << std::endl;
-        } else {
+        if (remaining_expression[index].type != Operator) {
           this->system.print_error_message(
               std::string("Expected operator but found '") +
               remaining_expression[index].value + "' instead.");
           return false;
         }
+
+        /**
+         * Update the current operation.
+         */
+        current_operation = remaining_expression[index].value;
+        DLOG(INFO) << "Operation updated for index " << index << ": '"
+                   << current_operation << "'." << std::endl;
       }
     }
 
@@ -855,40 +844,38 @@ bool Interpreter::interpret_function(const ParseResult &function_call,
    * We check whether we know this function and start the
    * corresponding interpretation.
    */
-  if (function_call.type == Function) {
-
-    /**
-     * Now we check if we know about a builtin function with the
-     * corresponding name.
-     */
-    std::unordered_map<std::string,
-                       std::function<bool(Interpreter *, const ParseResult &,
-                                          std::any &)>>::const_iterator
-        position_of_function =
-            this->builtin_functions.find(function_call.value);
-
-    /**
-     * If we did find the function, execute it.
-     */
-    if (position_of_function != this->builtin_functions.end()) {
-      std::function<bool(Interpreter *, const ParseResult &, std::any &)>
-          function = position_of_function->second;
-
-      /**
-       * Actually calling the function.
-       */
-      return function(this, function_call, result);
-    } else {
-      this->system.print_error_message(std::string("Could not interpret '") +
-                                       function_call.value +
-                                       "'. No function definition found.");
-      return false;
-    }
-  } else {
+  if (function_call.type != Function) {
     this->system.print_error_message(
         std::string("Could not interpret '") + function_call.value +
         "'. Expected function but found '" +
         System::name_for_type.at(function_call.type) + "' instead.");
+    return false;
+  }
+
+  /**
+   * Now we check if we know about a builtin function with the
+   * corresponding name.
+   */
+  std::unordered_map<std::string,
+                     std::function<bool(Interpreter *, const ParseResult &,
+                                        std::any &)>>::const_iterator
+      position_of_function = this->builtin_functions.find(function_call.value);
+
+  /**
+   * If we did find the function, execute it.
+   */
+  if (position_of_function != this->builtin_functions.end()) {
+    std::function<bool(Interpreter *, const ParseResult &, std::any &)>
+        function = position_of_function->second;
+
+    /**
+     * Actually calling the function.
+     */
+    return function(this, function_call, result);
+  } else {
+    this->system.print_error_message(std::string("Could not interpret '") +
+                                     function_call.value +
+                                     "'. No function definition found.");
     return false;
   }
 }
@@ -907,110 +894,106 @@ bool Interpreter::interpret_arguments_from_function_call(
    * The input value should be the ParseResult containing the whole
    * function call.
    */
-  if (function_call.type == Function) {
-    /**
-     * The function should have a single child, which is the argument
-     * list.
-     */
-    if (function_call.children.size() == 1) {
-      if (function_call.children[0].type == ArgumentList) {
-
-        /**
-         * Now we gather the values.
-         */
-        for (const ParseResult &argument : function_call.children[0].children) {
-
-          if (argument.type == Argument) {
-            std::string parameter_name = argument.value;
-
-            /**
-             * Check whether we should evaluate this argument now. If
-             * the parameters_to_interpret vector is empty, we
-             * interpret all arguments. Otherwise we check if the
-             * current argument is contained.
-             */
-            if (parameters_to_interpret.empty() ||
-                std::find(parameters_to_interpret.begin(),
-                          parameters_to_interpret.end(),
-                          parameter_name) != parameters_to_interpret.end()) {
-
-              DLOG(INFO) << "Interpreting argument for parameter: '" << parameter_name
-                         << "'." << std::endl;
-
-              /**
-               * The parameter has to have exactly one argument value
-               * as its child.
-               */
-              if (argument.children.size() == 1) {
-                std::any argument_value;
-                bool success =
-                  interpret_parse_result(argument.children[0], argument_value);
-
-                /**
-                 * If we couldn't interpret the argument, we return false. The
-                 * resulting error will have been printed already.
-                 */
-                if (!success) {
-                  return false;
-                }
-
-                /**
-                 * If the argument value could be interpreted successfully, we
-                 * store the resulting value using the argument_name.
-                 */
-                arguments[parameter_name] = argument_value;
-
-              } else {
-                this->system.print_error_message(
-                    std::string("In function call '") + function_call.value +
-                    "': Expected argument but found '" +
-                    System::name_for_type.at(argument.type) + "' instead.");
-                return false;
-              }
-
-            } else {
-              DLOG(INFO)
-                  << "Skipping interpretation of argument for parameter '"
-                  << parameter_name << "'." << std::endl;
-            }
-
-          } else {
-            this->system.print_error_message(
-                std::string("In function call '") + function_call.value +
-                "': Expected argument but found '" +
-                System::name_for_type.at(argument.type) + "' instead.");
-            return false;
-          }
-        }
-
-        /**
-         * When we reach the end of the loop this means that we have
-         * successfully interpreted all arguments we wanted to
-         * interpret.
-         */
-        return true;
-
-      } else {
-        this->system.print_error_message(
-            std::string("In function call '") + function_call.value +
-            "': Expected argument list but found '" +
-            System::name_for_type.at(function_call.children[0].type) +
-            "' instead.");
-        return false;
-      }
-    } else {
-      this->system.print_error_message(
-          std::string("Could not interpret function '") + function_call.value +
-          ": The function call contained more than the argument list.");
-      return false;
-    }
-  } else {
+  if (function_call.type != Function) {
     this->system.print_error_message(
         std::string("Unexpectedly found '") +
         System::name_for_type.at(function_call.type) +
         "' while interpreting function '" + function_call.value + "'.");
     return false;
   }
+
+  /**
+   * The function should have a single child, which is the argument
+   * list.
+   */
+  if (function_call.children.size() != 1) {
+    this->system.print_error_message(
+        std::string("Could not interpret function '") + function_call.value +
+        ": The function call contained more than the argument list.");
+    return false;
+  }
+
+  if (function_call.children[0].type != ArgumentList) {
+    this->system.print_error_message(
+        std::string("In function call '") + function_call.value +
+        "': Expected argument list but found '" +
+        System::name_for_type.at(function_call.children[0].type) +
+        "' instead.");
+    return false;
+  }
+
+  /**
+   * Now we gather the values.
+   */
+  for (const ParseResult &argument : function_call.children[0].children) {
+    /**
+     * Check whether we're dealing with an argument.
+     */
+    if (argument.type != Argument) {
+      this->system.print_error_message(
+          std::string("In function call '") + function_call.value +
+          "': Expected argument but found '" +
+          System::name_for_type.at(argument.type) + "' instead.");
+      return false;
+    }
+
+    std::string parameter_name = argument.value;
+
+    /**
+     * Check whether we should evaluate this argument now. If
+     * the parameters_to_interpret vector is empty, we
+     * interpret all arguments. Otherwise we check if the
+     * current argument is contained.
+     */
+    if (parameters_to_interpret.empty() ||
+        std::find(parameters_to_interpret.begin(),
+                  parameters_to_interpret.end(),
+                  parameter_name) != parameters_to_interpret.end()) {
+      DLOG(INFO) << "Interpreting argument for parameter: '" << parameter_name
+                 << "'." << std::endl;
+
+      /**
+       * The parameter has to have exactly one argument value
+       * as its child.
+       */
+      if (argument.children.size() != 1) {
+        this->system.print_error_message(
+            std::string("In function call '") + function_call.value +
+            "': Expected argument but found '" +
+            System::name_for_type.at(argument.type) + "' instead.");
+        return false;
+      }
+
+      std::any argument_value;
+      bool success =
+          interpret_parse_result(argument.children[0], argument_value);
+
+      /**
+       * If we couldn't interpret the argument, we return false. The
+       * resulting error will have been printed already.
+       */
+      if (!success) {
+        return false;
+      }
+
+      /**
+       * If the argument value could be interpreted successfully, we
+       * store the resulting value using the argument_name.
+       */
+      arguments[parameter_name] = argument_value;
+
+    } else {
+      DLOG(INFO) << "Skipping interpretation of argument for parameter '"
+                 << parameter_name << "'." << std::endl;
+    }
+  }
+
+  /**
+   * When we reach the end of the loop this means that we have
+   * successfully interpreted all arguments we wanted to
+   * interpret.
+   */
+  return true;
 }
 
 bool Interpreter::argument_value_for_parameter(

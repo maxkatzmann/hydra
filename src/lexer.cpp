@@ -473,16 +473,11 @@ bool Lexer::parse_string(const std::string &str, ParseResult &result) {
    */
   std::vector<Token> tokens;
   if (tokenize_string(str, tokens)) {
-#ifdef DEBUG
-    print_tokenized_string(tokens);
-#endif
-
     /**
      * Parse the tokenized string.
      */
     return parse_tokens(tokens, result);
   } else {
-
     /**
      * Return false if tokenizing the string failed.
      */
@@ -621,36 +616,35 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
     /**
      * We expect a 'var' as first token.
      */
-    if (lhs[0].value == "var") {
-      /**
-       * There are exactly two tokens. The first is 'var'. Now the
-       * second has to be Unknown since it should be a variable name.
-       */
-      if (lhs[1].type == Unknown) {
-
-        /**
-         * Everything went as expected.
-         */
-        ParseResult assignment_keyword(Assignment, lhs[0].value);
-        ParseResult assignment_variable(Variable, lhs[1].value);
-
-        result.children.push_back(assignment_keyword);
-        result.children.push_back(assignment_variable);
-      } else {
-        result.type = Error;
-        this->system.print_error_message(
-            std::string(
-                "Invalid assignment. Expected variable name but found '") +
-            lhs[0].value +
-            " instead. Use 'a = 10.0' or 'var a = 10.0' to assign a variable.");
-        return false;
-      }
-    } else {
+    if (lhs[0].value != "var") {
       result.type = Error;
       this->system.print_error_message(std::string(
           "Invalid assignment. Use 'var a = 10.0' to declare a variable."));
       return false;
     }
+
+    /**
+     * There are exactly two tokens. The first is 'var'. Now the
+     * second has to be Unknown since it should be a variable name.
+     */
+    if (lhs[1].type != Unknown) {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string(
+              "Invalid assignment. Expected variable name but found '") +
+          lhs[0].value +
+          " instead. Use 'a = 10.0' or 'var a = 10.0' to assign a variable.");
+      return false;
+    }
+
+    /**
+     * Everything went as expected.
+     */
+    ParseResult assignment_keyword(Assignment, lhs[0].value);
+    ParseResult assignment_variable(Variable, lhs[1].value);
+
+    result.children.push_back(assignment_keyword);
+    result.children.push_back(assignment_variable);
 
   } else {
     result.type = Error;
@@ -674,116 +668,6 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
         std::string("Error while parsing right hand side of assignment."));
   }
   return success;
-}
-
-bool Lexer::parse_initialization(const std::vector<Token> &tokens,
-                                 ParseResult &result) {
-
-  /**
-   * Check whether the first token signals an initialization.
-   */
-  if (tokens[0].type == Initialization) {
-
-    /**
-     * The type is initialization.
-     */
-    result.type = Initialization;
-    result.value = tokens[0].value;
-
-    /**
-     * Get the list of expected arguments.
-     */
-    std::unordered_map<std::string, Func>::const_iterator
-        position_of_arguments =
-            this->system.known_functions.find(tokens[0].value);
-
-    if (position_of_arguments != this->system.known_functions.end()) {
-      /**
-       * The arguments of an initialization are stored as children
-       * of the initialization token.
-       *
-       * They must not be empty.
-       */
-      if (!tokens[0].children.empty()) {
-        ParseResult argument_parse_result;
-        bool success = Lexer::parse_argument_list(tokens[0].children,
-                                                  position_of_arguments->second.arguments,
-                                                  argument_parse_result);
-
-        result.children.push_back(argument_parse_result);
-
-        /**
-         * If something went wrong, print usage of this
-         * initializer.
-         */
-        if (!success) {
-          this->system.print_error_message(
-              std::string(
-                  "An error occurred while parsing the argument list of '") +
-              tokens[0].value + "'.");
-          std::cerr << "> Usage of '" << tokens[0].value
-                    << "': " << tokens[0].value << "(";
-          System::print_argument_list(position_of_arguments->second.arguments);
-          std::cerr << ")" << std::endl;
-        }
-
-        return success;
-      } else {
-        /**
-         * If the argument list was empty, print an error.
-         */
-        result.type = Error;
-
-        this->system.print_error_message(
-            std::string("Missing arguments during initialization of '") +
-            tokens[0].value + "'.");
-        std::cerr << "> Usage of '" << tokens[0].value
-                  << "': " << tokens[0].value << "(";
-        System::print_argument_list(position_of_arguments->second.arguments);
-        std::cerr << ")" << std::endl;
-        return false;
-      }
-    }
-  } else {
-    result.type = Error;
-    this->system.print_error_message(
-        std::string("Invalid initialization: '") + tokens[0].value +
-        "' cannot be used to initialize a variable.");
-    return false;
-  }
-
-  /**
-   * If we haven't returned, yet, something went wrong.
-   */
-  return false;
-}
-
-bool Lexer::parse_number(const std::vector<Token> &tokens,
-                         ParseResult &result) {
-
-  /**
-   * Check if the this is a single number.
-   */
-  if (tokens.size() == 1) {
-    if (tokens[0].type == Number) {
-      result.type = Number;
-      result.value = tokens[0].value;
-      return true;
-    } else {
-      result.type = Error;
-      this->system.print_error_message(
-          std::string("Invalid argument: '") + tokens[0].value +
-          "' could not be read as '" + System::name_for_type.at(Number) + "'.");
-      return false;
-    }
-  } else {
-    result.type = Error;
-    this->system.print_error_message(
-        std::string("Invalid number of arguments near '") + tokens[0].value +
-        "'. Token could not be read as '" + System::name_for_type.at(Number) +
-        "'.");
-    return false;
-  }
 }
 
 bool Lexer::parse_expression(const std::vector<Token> &tokens,
@@ -842,44 +726,40 @@ bool Lexer::parse_expression(const std::vector<Token> &tokens,
         /**
          * Check if the token is an operator.
          */
-        if (tokens[index].type != Operator) {
-          /**
-           * Evaluate the term.
-           */
-          ParseResult term_result;
-          bool success = parse_tokens({tokens[index]}, term_result);
-
-          result.children.push_back(term_result);
-
-          if (!success) {
-            result.type = Error;
-            return false;
-          }
-
-        } else {
+        if (tokens[index].type == Operator) {
           result.type = Error;
           this->system.print_error_message(
               std::string("Invalid syntax: Unexpectedly found operator."));
+          return false;
+        }
+        /**
+         * Evaluate the term.
+         */
+        ParseResult term_result;
+        bool success = parse_tokens({tokens[index]}, term_result);
+
+        result.children.push_back(term_result);
+
+        if (!success) {
+          result.type = Error;
           return false;
         }
       } else {
         /**
          * Odd indices are supposed to be operators.
          */
-        if (tokens[index].type == Operator) {
-          /**
-           * We found an operator.
-           */
-          ParseResult operator_result(Operator, tokens[index].value);
-          result.children.push_back(operator_result);
-
-        } else {
+        if (tokens[index].type != Operator) {
           result.type = Error;
           this->system.print_error_message(
               std::string("Invalid syntax: Expected operator but found '") +
               tokens[index].value + "' instead.");
           return false;
         }
+        /**
+         * We found an operator.
+         */
+        ParseResult operator_result(Operator, tokens[index].value);
+        result.children.push_back(operator_result);
       }
     }
 
@@ -901,80 +781,72 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
   /**
    * A function call consists of the function name only, with the arguments as children.
    */
-  if (tokens.size() == 1) {
-
-    /**
-     * The first token should be a function.
-     */
-    if (tokens[0].type == Function) {
-
-      result.type = Function;
-      result.value = tokens[0].value;
-
-      /**
-       * The children of the function token are the arguments.
-       */
-
-      /**
-       * Get the arguments for the function.
-       */
-      std::unordered_map<std::string, Func>::const_iterator
-        position_of_function_arguments =
-        this->system.known_functions.find(tokens[0].value);
-
-      /**
-       * Check whether we know this function.
-       */
-      if (position_of_function_arguments !=
-          this->system.known_functions.end()) {
-
-          /**
-           * Parse the functions argument list
-           */
-          ParseResult argument_parse_result;
-          bool success = parse_argument_list(tokens[0].children,
-                              position_of_function_arguments->second.arguments,
-                              argument_parse_result);
-          result.children.push_back(argument_parse_result);
-
-          /**
-           * If we did not succeed parsing the argument list, print
-           * the usage of the function.
-           */
-          if (!success) {
-            result.type = Error;
-            this->system.print_error_message(
-                std::string("Invalid arguments in function call '") +
-                tokens[0].value + "'.");
-            std::cerr << "> Usage of '" << tokens[0].value
-                      << "': " << tokens[0].value << "(";
-            System::print_argument_list(
-                position_of_function_arguments->second.arguments);
-            std::cerr << ")" << std::endl;
-          }
-
-          return success;
-      } else {
-        /**
-         * We don't know the function.
-         */
-        result.type = Error;
-        this->system.print_error_message(std::string("Unknown function: '") +
-                                         tokens[0].value + "'.");
-        return false;
-      }
-    } else {
-      result.type = Error;
-      this->system.print_error_message(
-          std::string("Invalid syntax. Expected function name but found '") +
-          tokens[0].value + "', which is of type '" +
-          System::name_for_type.at(tokens[0].type));
-      return false;
-    }
-  } else {
+  if (tokens.size() != 1) {
     result.type = Error;
     this->system.print_error_message(std::string(
         "Invalid number of statements. Use only one function call per line."));
+    return false;
+  }
+
+  /**
+   * The first token should be a function.
+   */
+  if (tokens[0].type != Function) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid syntax. Expected function name but found '") +
+        tokens[0].value + "', which is of type '" +
+        System::name_for_type.at(tokens[0].type));
+    return false;
+  }
+
+  result.type = Function;
+  result.value = tokens[0].value;
+
+  /**
+   * Get the arguments for the function.
+   */
+  std::unordered_map<std::string, Func>::const_iterator
+      position_of_function_arguments =
+          this->system.known_functions.find(tokens[0].value);
+
+  /**
+   * Check whether we know this function.
+   */
+  if (position_of_function_arguments != this->system.known_functions.end()) {
+    /**
+     * Parse the functions argument list
+     */
+    ParseResult argument_parse_result;
+    bool success = parse_argument_list(
+        tokens[0].children, position_of_function_arguments->second.arguments,
+        argument_parse_result);
+    result.children.push_back(argument_parse_result);
+
+    /**
+     * If we did not succeed parsing the argument list, print
+     * the usage of the function.
+     */
+    if (!success) {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Invalid arguments in function call '") +
+          tokens[0].value + "'.");
+      std::cerr << "> Usage of '" << tokens[0].value << "': " << tokens[0].value
+                << "(";
+      System::print_argument_list(
+          position_of_function_arguments->second.arguments);
+      std::cerr << ")" << std::endl;
+    }
+
+    return success;
+  } else {
+    /**
+     * We don't know the function.
+     */
+    result.type = Error;
+    this->system.print_error_message(std::string("Unknown function: '") +
+                                     tokens[0].value + "'.");
     return false;
   }
 
@@ -984,6 +856,134 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
   return false;
 }
 
+
+bool Lexer::parse_initialization(const std::vector<Token> &tokens,
+                                 ParseResult &result) {
+
+  /**
+   * Check whether the first token signals an initialization.
+   */
+  if (tokens[0].type != Initialization) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid initialization: '") + tokens[0].value +
+        "' cannot be used to initialize a variable.");
+    return false;
+  }
+
+  /**
+   * The type is initialization.
+   */
+  result.type = Initialization;
+  result.value = tokens[0].value;
+
+  /**
+   * Get the list of expected arguments.
+   */
+  std::unordered_map<std::string, Func>::const_iterator position_of_arguments =
+      this->system.known_functions.find(tokens[0].value);
+
+  if (position_of_arguments != this->system.known_functions.end()) {
+    /**
+     * The arguments of an initialization are stored as children
+     * of the initialization token.
+     *
+     * They must not be empty.
+     */
+    if (tokens[0].children.empty()) {
+      /**
+       * If the argument list was empty, print an error.
+       */
+      result.type = Error;
+
+      this->system.print_error_message(
+                                       std::string("Missing arguments during initialization of '") +
+                                       tokens[0].value + "'.");
+      std::cerr << "> Usage of '" << tokens[0].value << "': " << tokens[0].value
+                << "(";
+      System::print_argument_list(position_of_arguments->second.arguments);
+      std::cerr << ")" << std::endl;
+      return false;
+    }
+
+    ParseResult argument_parse_result;
+    bool success = Lexer::parse_argument_list(
+        tokens[0].children, position_of_arguments->second.arguments,
+        argument_parse_result);
+
+    result.children.push_back(argument_parse_result);
+
+    /**
+     * If something went wrong, print usage of this
+     * initializer.
+     */
+    if (!success) {
+      this->system.print_error_message(
+          std::string(
+              "An error occurred while parsing the argument list of '") +
+          tokens[0].value + "'.");
+      std::cerr << "> Usage of '" << tokens[0].value << "': " << tokens[0].value
+                << "(";
+      System::print_argument_list(position_of_arguments->second.arguments);
+      std::cerr << ")" << std::endl;
+    }
+
+    return success;
+  }
+
+  /**
+   * If we haven't returned, yet, something went wrong.
+   */
+  return false;
+}
+
+bool Lexer::parse_number(const std::vector<Token> &tokens,
+                         ParseResult &result) {
+
+  /**
+   * Check if the this is a single number.
+   */
+  if (tokens.size() != 1) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid number of arguments near '") + tokens[0].value +
+        "'. Token could not be read as '" + System::name_for_type.at(Number) +
+        "'.");
+    return false;
+  }
+
+  if (tokens[0].type != Number) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid argument: '") + tokens[0].value +
+        "' could not be read as '" + System::name_for_type.at(Number) + "'.");
+    return false;
+  }
+
+  result.type = Number;
+  result.value = tokens[0].value;
+  return true;
+}
+
+/**
+ * Parses a string that represents a range.  If the parsed string
+ * is not a number, the result will have type Error.
+ */
+bool Lexer::parse_range(const std::vector<Token> &tokens, ParseResult &result) {
+
+  /**
+   * A range is a single token that has the arguments of the range as
+   * its children.
+   */
+  if (tokens.size() != 1) {
+    this->system.print_error_message(
+        std::string("Invalid number of arguments for type '") +
+        System::name_for_type.at(Range) + "'. Expected one, but found " +
+        std::to_string(tokens.size()) + ".");
+    return false;
+  }
+}
+
 bool Lexer::parse_string_token(const std::vector<Token> &tokens,
                                ParseResult &result) {
 
@@ -991,25 +991,27 @@ bool Lexer::parse_string_token(const std::vector<Token> &tokens,
    * A string token has to consist of exactly one token. Which
    * contains the string.
    */
-  if (tokens.size() == 1) {
-    if (tokens[0].type == String) {
-      result.type = String;
-      result.value = tokens[0].value;
-      return true;
-    } else {
-      result.type = Error;
-      this->system.print_error_message(
-          std::string("Unexpectedly found '") +
-          System::name_for_type.at(tokens[0].type) +
-          "' while trying to parse a string.");
-      return false;
-    }
-  } else {
+  if (tokens.size() != 1) {
     result.type = Error;
     this->system.print_error_message(
         std::string("Invalid number of argument in string."));
     return false;
   }
+
+  /**
+   * If the type is not string we have an error.
+   */
+  if (tokens[0].type != String) {
+    result.type = Error;
+    this->system.print_error_message(std::string("Unexpectedly found '") +
+                                     System::name_for_type.at(tokens[0].type) +
+                                     "' while trying to parse a string.");
+    return false;
+  }
+
+  result.type = String;
+  result.value = tokens[0].value;
+  return true;
 }
 
 bool Lexer::parse_argument_list(
@@ -1027,171 +1029,166 @@ bool Lexer::parse_argument_list(
   /**
    * If the argument list is empty, something went wrong.
    */
-  if (!tokens.empty()) {
-
-    /**
-     * The argument list has the format:
-     * 'argument_name: argument_values ..., argument_name: argument_values ...'
-     *
-     * We proceed as follows. Get the argument name and check whether
-     * it matches the expected argument. Then check whether the
-     * argument is followed by ':'. Then gather the argument values.
-     */
-    int token_index = 0;
-    while (token_index < (int)tokens.size()) {
-
-      /**
-       * First check whether we have not already found more arguments
-       * than are expected.
-       */
-      if (number_of_found_arguments < (int)expected_arguments.size()) {
-        /**
-         * Check whether the argument matches the expected argument.
-         */
-        std::string argument_name = tokens[token_index].value;
-        if (argument_name ==
-            expected_arguments[number_of_found_arguments]) {
-
-          /**
-           * Arguments match. Next up: check whether the next token is
-           * a ':'. Thus, check if we're not already at the end of the
-           * argument list.
-           */
-          ++token_index;
-          if (token_index < (int)tokens.size()) {
-            /**
-             * Check if this next token is a ':'.
-             */
-            if (tokens[token_index].value == ":") {
-
-              /**
-               * Now collect the argument values. First check again if
-               * we're not at the end of the argument list.
-               */
-              ++token_index;
-
-              if (token_index < (int)tokens.size()) {
-
-                /**
-                 * Luckily, function calls in argument values have
-                 * their arguments as children and thus do not appear
-                 * in this argument list. Therefore, we only need to
-                 * look for the next ',' or the end of the token list.
-                 */
-                std::vector<Token> argument_value_tokens;
-
-                /**
-                 * While we have not found a ',' or the end of the
-                 * token list, collect tokens for the current argument
-                 * value.
-                 */
-                while (tokens[token_index].value != "," &&
-                       token_index < (int)tokens.size()) {
-                  /**
-                   * When we find a ':' before finding a ',' or the end
-                   * of the token list, the syntax is invalid.
-                   */
-                  if (tokens[token_index].value == ":") {
-                    result.type = Error;
-                    this->system.print_error_message(
-                        std::string("Invalid syntax in function call. Expected "
-                                    "',' but found ':' instead."));
-                    return false;
-                  }
-
-                  /**
-                   * Add the token to the current list, and continue.
-                   */
-                  argument_value_tokens.push_back(tokens[token_index]);
-                  ++token_index;
-                }
-
-                /**
-                 * We have now collected all values for this argument.  Parse them!
-                 */
-                ParseResult argument_result(Argument, argument_name);
-
-                /**
-                 * Parse the argument value.
-                 */
-                ParseResult argument_evaluation;
-                bool success = parse_tokens(argument_value_tokens, argument_evaluation);
-
-                /**
-                 * If something went wrong, return false;
-                 */
-                if (!success) {
-                  result.type = Error;
-                  return false;
-                }
-
-                /**
-                 * Add the parsed results.
-                 */
-                argument_result.children.push_back(argument_evaluation);
-                result.children.push_back(argument_result);
-
-                /**
-                 * We have just identified an argument.
-                 */
-                ++number_of_found_arguments;
-
-                /**
-                 * At this point we're either at a ',' or at the end
-                 * of the argument list. We increase the
-                 * token_index. If we're at a ',' we should then be at
-                 * the next argument, otherwise we just stop anyway.
-                 */
-                ++token_index;
-              } else {
-                result.type = Error;
-                this->system.print_error_message(
-                    std::string("Missing argument value in function call."));
-                return false;
-              }
-            } else {
-              result.type = Error;
-              this->system.print_error_message(
-                  std::string("Invalid syntax in function call. Expected ':' "
-                              "but found '") +
-                  tokens[token_index].value + "' instead.");
-              return false;
-            }
-
-          } else {
-            result.type = Error;
-            this->system.print_error_message(
-                std::string("Missing argument value in function call."));
-            return false;
-          }
-
-        } else {
-          result.type = Error;
-          this->system.print_error_message(
-              std::string("Invalid argument in function call. Expected '") +
-              expected_arguments[number_of_found_arguments] + "' but found '" +
-              tokens[token_index].value + "' instead.");
-          return false;
-        }
-      } else {
-        result.type = Error;
-        this->system.print_error_message(
-            std::string("Extraneous argument in function call."));
-        return false;
-      }
-    }
-
-    /**
-     * When we arrived here, we parsed the whole argument list
-     * successfully.
-     */
-    return true;
-  } else {
+  if (tokens.empty()) {
     result.type = Error;
     this->system.print_error_message(
         std::string("Missing argument in function call."));
     return false;
   }
+
+  /**
+   * The argument list has the format:
+   * 'argument_name: argument_values ..., argument_name: argument_values ...'
+   *
+   * We proceed as follows. Get the argument name and check whether
+   * it matches the expected argument. Then check whether the
+   * argument is followed by ':'. Then gather the argument values.
+   */
+  int token_index = 0;
+  while (token_index < (int)tokens.size()) {
+    /**
+     * First check whether we have not already found more arguments
+     * than are expected. We check for >= since we are currently
+     * finding a new argument. If we already have enough this means
+     * we're currently finding an extra argument.
+     */
+    if (number_of_found_arguments >= (int)expected_arguments.size()) {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Extraneous argument in function call."));
+      return false;
+    }
+
+    /**
+     * Check whether the argument matches the expected argument.
+     */
+    std::string argument_name = tokens[token_index].value;
+    if (argument_name != expected_arguments[number_of_found_arguments]) {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Invalid argument in function call. Expected '") +
+          expected_arguments[number_of_found_arguments] + "' but found '" +
+          tokens[token_index].value + "' instead.");
+      return false;
+    }
+
+    /**
+     * Arguments match. Next up: check whether the next token is
+     * a ':'. Thus, check if we're not already at the end of the
+     * argument list.
+     */
+    ++token_index;
+    if (token_index >= (int)tokens.size()) {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Missing argument value in function call."));
+      return false;
+    }
+
+    /**
+     * Check if this next token is a ':'.
+     */
+    if (tokens[token_index].value != ":") {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Invalid syntax in function call. Expected ':' "
+                      "but found '") +
+          tokens[token_index].value + "' instead.");
+      return false;
+    }
+
+    /**
+     * Now collect the argument values. First check again if
+     * we're not at the end of the argument list.
+     */
+    ++token_index;
+
+    if (token_index >= (int)tokens.size()) {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Missing argument value in function call."));
+      return false;
+    }
+
+    /**
+     * Luckily, function calls in argument values have
+     * their arguments as children and thus do not appear
+     * in this argument list. Therefore, we only need to
+     * look for the next ',' or the end of the token list.
+     */
+    std::vector<Token> argument_value_tokens;
+
+    /**
+     * While we have not found a ',' or the end of the
+     * token list, collect tokens for the current argument
+     * value.
+     */
+    while (tokens[token_index].value != "," &&
+           token_index < (int)tokens.size()) {
+      /**
+       * When we find a ':' before finding a ',' or the end
+       * of the token list, the syntax is invalid.
+       */
+      if (tokens[token_index].value == ":") {
+        result.type = Error;
+        this->system.print_error_message(
+            std::string("Invalid syntax in function call. Expected "
+                        "',' but found ':' instead."));
+        return false;
+      }
+
+      /**
+       * Add the token to the current list, and continue.
+       */
+      argument_value_tokens.push_back(tokens[token_index]);
+      ++token_index;
+    }
+
+    /**
+     * We have now collected all values for this argument.  Parse
+     * them!
+     */
+    ParseResult argument_result(Argument, argument_name);
+
+    /**
+     * Parse the argument value.
+     */
+    ParseResult argument_evaluation;
+    bool success = parse_tokens(argument_value_tokens, argument_evaluation);
+
+    /**
+     * If something went wrong, return false;
+     */
+    if (!success) {
+      result.type = Error;
+      return false;
+    }
+
+    /**
+     * Add the parsed results.
+     */
+    argument_result.children.push_back(argument_evaluation);
+    result.children.push_back(argument_result);
+
+    /**
+     * We have just identified an argument.
+     */
+    ++number_of_found_arguments;
+
+    /**
+     * At this point we're either at a ',' or at the end
+     * of the argument list. We increase the
+     * token_index. If we're at a ',' we should then be at
+     * the next argument, otherwise we just stop anyway.
+     */
+    ++token_index;
+  }
+
+  /**
+   * When we arrived here, we parsed the whole argument list
+   * successfully.
+   */
+  return true;
 }
 
 void Lexer::print_parse_result(const ParseResult &result,

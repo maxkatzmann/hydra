@@ -177,6 +177,12 @@ class Lexer {
   bool parse_number(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
+   * Parses a string that represents a range.  If the parsed string
+   * is not a number, the result will have type Error.
+   */
+  bool parse_range(const std::vector<Token> &tokens, ParseResult &result);
+
+  /**
    * Parses a string that represents a string.
    */
   bool parse_string_token(const std::vector<Token> &tokens, ParseResult &result);
