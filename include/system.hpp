@@ -35,10 +35,11 @@ enum Type {
   Initialization = 8,
   Number = 9,
   Operator = 10,
-  Range = 11,
-  String = 12,
-  Unknown = 13,
-  Variable = 14
+  Parenthesis = 11,
+  Range = 12,
+  String = 13,
+  Unknown = 14,
+  Variable = 15
 };
 
 /**

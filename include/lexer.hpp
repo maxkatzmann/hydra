@@ -58,6 +58,12 @@ struct ParseResult {
   Type type = Unknown;
   std::string value = "";
   std::vector<ParseResult> children = {};
+
+  /**
+   * A parse result is associated with the number of the line from
+   * which it was parsed.
+   */
+  int line_number = -1;
 };
 
 class Lexer {
@@ -131,7 +137,13 @@ class Lexer {
   Type type_of_tokenized_string(const std::vector<Token> &tokenized_string);
 
   /**
-   * Parses a string.
+   * Parses lines of code.
+   */
+  bool parse_code(const std::vector<std::string> &code,
+                  std::vector<ParseResult> &parsed_code);
+
+  /**
+   * Parses a line of code.
    */
   bool parse_string(const std::string &str, ParseResult &result);
 
@@ -171,10 +183,23 @@ class Lexer {
   bool parse_initialization(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
+   * Parses a string that represents the definition of a for-loop.  If
+   * the parsed string is not a for-loop, the result will have type
+   * Error.
+   */
+  bool parse_loop(const std::vector<Token> &tokens, ParseResult &result);
+
+  /**
    * Parses a string that represents a number.  If the parsed string
    * is not a number, the result will have type Error.
    */
   bool parse_number(const std::vector<Token> &tokens, ParseResult &result);
+
+  /**
+   * Parses a string that represents a parenthesis.  If the parsed
+   * string is not a parenthesis, the result will have type Error.
+   */
+  bool parse_parenthesis(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents a range.  If the parsed string

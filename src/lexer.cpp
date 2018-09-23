@@ -17,9 +17,12 @@ Lexer::Lexer(System &system) : system(system) {
   this->known_parsers = {
       {Assignment, &Lexer::parse_assignment},
       {Expression, &Lexer::parse_expression},
+      {Loop, &Lexer::parse_loop},
       {Function, &Lexer::parse_function},
       {Initialization, &Lexer::parse_initialization},
       {Number, &Lexer::parse_number},
+      {Parenthesis, &Lexer::parse_parenthesis},
+      {Range, &Lexer::parse_range},
       {String, &Lexer::parse_string_token}
   };
 }
@@ -361,7 +364,7 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
     }
 
   } while (current_index != (int)std::string::npos &&
-           current_index != (int)cleaned_string.length() - 1);
+           current_index <= (int)cleaned_string.length());
 
   return true;
 }
@@ -464,6 +467,110 @@ Type Lexer::type_of_tokenized_string(
   return tokenized_string[0].type;
 }
 
+bool Lexer::parse_code(const std::vector<std::string> &code,
+                       std::vector<ParseResult> &parsed_code) {
+  /**
+   * We iterate all lines of code and try to parse them.
+   *
+   * Loops, however, have a special role. When a loop is started, all
+   * lines within the loop belong to the loop. That is, all the lines
+   * in the loop become children of the loop parse result. Since we
+   * can have nested loops, we need to keep track of where the current
+   * code lines belong.
+   *
+   * The code_scopes stores vectors of parse results. When a line is
+   * being parsed, the result is added to the last vector in the
+   * code_scopes vector. If we're in a loop, this last vector is the
+   * child-vector of the corresponding loop-parse-result.
+   */
+  std::vector<std::vector<ParseResult> *> code_scopes = {&parsed_code};
+
+  /**
+   * In order to being able to print meaningful error messages, we
+   * keep track of which loop was opened in which line. Since we don't
+   * have a loop initially, we assign -1 to the first scope.
+   */
+  std::vector<int> line_number_for_scope = {-1};
+
+  /**
+   * Iterate all lines.
+   */
+  for (int line_number = 0; line_number < (int)code.size(); ++line_number) {
+
+    /**
+     * Let the system know about which line we're currently dealing
+     * with.
+     */
+    this->system.line_number = line_number;
+    this->system.current_line = code[line_number];
+
+    /**
+     * Parse the line.
+     */
+    ParseResult line_parse_result;
+
+    /**
+     * Assign the line number to the parse result. Offset with 1 since
+     * line numbers don't start at 0.
+     */
+    line_parse_result.line_number = line_number + 1;
+
+    if (!parse_string(code[line_number], line_parse_result)) {
+      return false;
+    }
+
+    /**
+     * If the line is a loop-definition, we add the loop definition to
+     * the back of the current code_scope AND open a new code scope by
+     * adding the children of the loop-definition to the code_scopes.
+     */
+    if (line_parse_result.type == Loop) {
+      code_scopes.back()->push_back(line_parse_result);
+      code_scopes.push_back(&(code_scopes.back()->back().children));
+
+      /**
+       * Keep track of the line number associated with this loop.
+       */
+      line_number_for_scope.push_back(line_parse_result.line_number);
+    } else if (line_parse_result.type == Parenthesis) {
+      /**
+       * If the line is of type Parenthesis, it is meant to close a
+       * loop. We close the loop by removing the children vector of
+       * the loop-parse-result from the code_scopes vector.
+       */
+      code_scopes.pop_back();
+      line_number_for_scope.pop_back();
+      /**
+       * The parenthesis itself is useless and does not need to be
+       * interpreted later, so we don't add it.
+       */
+    } else {
+      /**
+       * The line is not a loop or parenthesis so we simply add it in
+       * the current code_scope.
+       */
+      code_scopes.back()->push_back(line_parse_result);
+    }
+  }
+
+  /**
+   * We check whether all opened loops have been closed. Which is the
+   * case, if the code_scopes vector contains only the initial scope.
+   */
+  if (code_scopes.size() != 1) {
+    this->system.print_error_message(
+        std::string(
+            "Could not parse code. Missing parenthesis to loop in line: ") +
+        std::to_string(line_number_for_scope.back()) + ".");
+    return false;
+  }
+
+  /**
+   * If we reach this point, everything went well.
+   */
+  return true;
+}
+
 bool Lexer::parse_string(const std::string &str, ParseResult &result) {
 
   DLOG(INFO) << "Parsing string: '" << str << "'." << std::endl;
@@ -473,6 +580,10 @@ bool Lexer::parse_string(const std::string &str, ParseResult &result) {
    */
   std::vector<Token> tokens;
   if (tokenize_string(str, tokens)) {
+#ifdef DEBUG
+    Lexer::print_tokenized_string(tokens);
+#endif
+
     /**
      * Parse the tokenized string.
      */
@@ -515,7 +626,7 @@ bool Lexer::parse_tokens(const std::vector<Token> &tokens,
      */
     if (tokens.size() == 1) {
       DLOG(INFO) << "Unknown token: '" << tokens[0].value
-                 << "'. Assuming that this is a variable name..." << std::endl;
+                 << "'. Maybe it is a variable name..." << std::endl;
       result.type = Unknown;
       result.value = tokens[0].value;
       return true;
@@ -775,6 +886,7 @@ bool Lexer::parse_expression(const std::vector<Token> &tokens,
   }
 }
 
+
 bool Lexer::parse_function(const std::vector<Token> &tokens,
                            ParseResult &result) {
 
@@ -818,6 +930,7 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
      * Parse the functions argument list
      */
     ParseResult argument_parse_result;
+    argument_parse_result.line_number = result.line_number; // Pass on line_number.
     bool success = parse_argument_list(
         tokens[0].children, position_of_function_arguments->second.arguments,
         argument_parse_result);
@@ -855,7 +968,6 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
    */
   return false;
 }
-
 
 bool Lexer::parse_initialization(const std::vector<Token> &tokens,
                                  ParseResult &result) {
@@ -937,6 +1049,112 @@ bool Lexer::parse_initialization(const std::vector<Token> &tokens,
   return false;
 }
 
+bool Lexer::parse_loop(const std::vector<Token> &tokens,
+                           ParseResult &result) {
+  /**
+   * A for loop consists of
+   *
+   * the keyword 'for'
+   * followed by the loop-variable name
+   * followed by the keyword 'in'
+   * then the range [...]
+   * and finally the opening parenthesis.
+   *
+   * which makes 5 tokens in total.
+   */
+  if (tokens.size() != 5) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Could not parse for-loop: invalid number of argument."));
+    return false;
+  }
+
+  /**
+   * The first token must be 'for'
+   */
+  if (tokens[0].value != "for") {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Could not parse for-loop: invalid number of argument."));
+    return false;
+  }
+
+  result.type = Loop;
+  result.value = tokens[0].value;
+
+  /**
+   * Now we get the loop variable. Since the lexer doesn't know what
+   * variables are, Unknown may also represent a variable.
+   */
+  if (tokens[1].type != Unknown && tokens[1].type != Variable) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string(
+            "Could not parse for-loop: Expected variable name but found '") +
+        System::name_for_type.at(tokens[1].type) + "'.");
+    return false;
+  }
+
+  /**
+   * The loop variable is the first child of the
+   * for-loop-parse-result.
+   */
+  ParseResult variable_parse_result = ParseResult(Variable, tokens[1].value);
+  variable_parse_result.line_number = result.line_number; // Pass the line_number.
+  result.children.push_back(variable_parse_result);
+
+  /**
+   * We now expect the keyword in.
+   */
+  if (tokens[2].value != "in") {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Could not parse for-loop: Expected 'in' but found '") +
+        System::name_for_type.at(tokens[2].type) +
+        "' after the loop variable.");
+    return false;
+  }
+
+  /**
+   * Next up is the range.
+   */
+  if (tokens[3].type != Range) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Could not parse for-loop: Expected 'Range' but found '") +
+        System::name_for_type.at(tokens[3].type) + "' instead.");
+    return false;
+  }
+
+  ParseResult range_parse_result;
+  range_parse_result.line_number = result.line_number; // Pass the line_number.
+  bool range_parse_success = parse_range({tokens[3]}, range_parse_result);
+
+  if (!range_parse_success) {
+    result.type = Error;
+    return false;
+  }
+
+  /**
+   * The range is the second child of the for loop.
+   */
+  result.children.push_back(range_parse_result);
+
+  /**
+   * Finally we check whether the last token is the opening
+   * parenthesis.
+   */
+  if (tokens[4].value != "{") {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Could not parse for-loop: Expected '{' but found '") +
+        tokens[4].value + "' instead.");
+    return false;
+  }
+
+  return true;
+}
+
 bool Lexer::parse_number(const std::vector<Token> &tokens,
                          ParseResult &result) {
 
@@ -965,6 +1183,48 @@ bool Lexer::parse_number(const std::vector<Token> &tokens,
   return true;
 }
 
+bool Lexer::parse_parenthesis(const std::vector<Token> &tokens,
+                              ParseResult &result) {
+  /**
+   * A line that contains a parenthesis has to have exactly one token
+   * and that token is the parenthesis.
+   */
+  if (tokens.size() != 1) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid number of arguments. You can only have on '}' in "
+                    "a line."));
+    return false;
+  }
+
+  /**
+   * A token representing a parenthesis has to be '}'.
+   */
+  if (tokens[0].value != "}") {
+
+    result.type = Error;
+    /**
+     * If it is a '{' instead, maybe the opening parenthesis of a
+     * for-loop was placed on a new line. Which we don't allow.
+     */
+    if (tokens[0].value == "{") {
+      this->system.print_error_message(std::string(
+          "A line must not start with '{', please place parentheses of "
+          "for-loops in the same line as the loop-definition."));
+    } else {
+      this->system.print_error_message(
+          std::string("Expected '}', but found '") + tokens[0].value +
+          "' instead.");
+    }
+
+    return false;
+  }
+
+  result.type = Parenthesis;
+  result.value = tokens[0].value;
+  return true;
+}
+
 /**
  * Parses a string that represents a range.  If the parsed string
  * is not a number, the result will have type Error.
@@ -976,12 +1236,94 @@ bool Lexer::parse_range(const std::vector<Token> &tokens, ParseResult &result) {
    * its children.
    */
   if (tokens.size() != 1) {
+    result.type = Error;
     this->system.print_error_message(
         std::string("Invalid number of arguments for type '") +
         System::name_for_type.at(Range) + "'. Expected one, but found " +
         std::to_string(tokens.size()) + ".");
     return false;
   }
+
+  /**
+   * Check whether we're dealing with a range.
+   */
+
+  if (tokens[0].type != Range) {
+    result.type = Error;
+    this->system.print_error_message(std::string("Unexpectedly found '") +
+                                     System::name_for_type.at(tokens[0].type) +
+                                     "' while trying to parse a range.");
+    return false;
+  }
+
+  /**
+   * A range token has exactly 5 children.
+   *
+   * 'from , step , to' (5 including commas.)
+   */
+  if (tokens[0].children.size() != 5) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string(
+            "Invalid number of arguments in range. Expected one, but found ") +
+        std::to_string(tokens.size()) + ".");
+    return false;
+  }
+
+  result.type = Range;
+  result.value = tokens[0].value;
+
+  /**
+   * Now we parse the three range tokens.
+   */
+  for (int index = 0; index < (int)tokens[0].children.size(); ++index) {
+
+    /**
+     * Odd positions have to be commas!
+     */
+    if (index % 2 == 1) {
+
+      /**
+       * Check whether this is a comma.
+       */
+      if (tokens[0].children[index].value != ",") {
+        result.type = Error;
+        this->system.print_error_message(
+            std::string("Invalid syntax. Expected ',' but found '") +
+            tokens[0].children[index].value +
+            "' instead. Use '[lowerbound, stepsize, upperbound]' to define a "
+            "range.");
+        return false;
+      }
+
+      /**
+       * We don't need to add the comma as a parse result.
+       */
+      continue;
+    }
+
+    ParseResult range_token_parse_result;
+    range_token_parse_result.line_number = result.line_number; // Pass on line_number.
+
+    /**
+     * Try to parse the token in the range.
+     */
+    bool success =
+        parse_tokens({tokens[0].children[index]}, range_token_parse_result);
+
+    if (!success) {
+      result.type = Error;
+      this->system.print_error_message(std::string("Could not parse range."));
+      return false;
+    }
+
+    /**
+     * Add the parse result as child of the range-parse-result.
+     */
+    result.children.push_back(range_token_parse_result);
+  }
+
+  return true;
 }
 
 bool Lexer::parse_string_token(const std::vector<Token> &tokens,
@@ -1149,11 +1491,13 @@ bool Lexer::parse_argument_list(
      * them!
      */
     ParseResult argument_result(Argument, argument_name);
+    argument_result.line_number = result.line_number;
 
     /**
      * Parse the argument value.
      */
     ParseResult argument_evaluation;
+    argument_evaluation.line_number = result.line_number;
     bool success = parse_tokens(argument_value_tokens, argument_evaluation);
 
     /**
@@ -1193,8 +1537,8 @@ bool Lexer::parse_argument_list(
 
 void Lexer::print_parse_result(const ParseResult &result,
                                const std::string &indentation) {
-  std::cout << indentation << System::name_for_type.at(result.type) << ": "
-            << result.value << std::endl;
+  std::cout << indentation << System::name_for_type.at(result.type) << ": '"
+            << result.value << "' (" << result.line_number << ")" << std::endl;
   for (const ParseResult &child_result : result.children) {
     Lexer::print_parse_result(child_result, indentation + "\t");
   }

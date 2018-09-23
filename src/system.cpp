@@ -26,6 +26,7 @@ const std::unordered_map<Type, std::string, std::hash<int>>
         {Loop, "Loop"},
         {Number, "Number"},
         {Operator, "Operator"},
+        {Parenthesis, "Parenthesis"},
         {Range, "Range"},
         {String, "String"},
         {Unknown, "Unknown"},
@@ -59,7 +60,9 @@ System::System() {
                               {"-", Operator},
                               {"*", Operator},
                               {"/", Operator},
-                              {"=", Assignment}};
+                              {"=", Assignment},
+                              {"{", Parenthesis},
+                              {"}", Parenthesis}};
 
   /**
    * The initially known functions.

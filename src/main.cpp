@@ -61,7 +61,16 @@ int main(int argc, char *argv[]) {
   //     "var o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
 
   std::vector<std::string> code = {
-                                   "print(message: \"Bow to the mighty Hydra!\n\")"
+      "for i in [0.0, 1.0, 3.0] {",
+      "\tprint(message: \"Bow to the mighty Hydra!\")",
+      "\tfor j in [0.0, 1.0, 2.0] {",
+      "\t\tprint(message: \"-\")",
+      "\t}",
+      "}",
+      "print(message: \"Done!\")"
+                                   // "var a = M_PI * 2.0",
+                                   // "var b = 3 * a",
+                                   // "var c = random(from: a, to: b)"
   };
 
   std::cout << "Interpreting code: " << std::endl << std::endl;
@@ -70,42 +79,21 @@ int main(int argc, char *argv[]) {
   }
   std::cout << std::endl;
 
-  for (int line_index = 0; line_index < (int)code.size(); ++line_index) {
+  /**
+   * First parse the whole code.
+   */
+  std::vector<hydra::ParseResult> parsed_code;
+  lexer.parse_code(code, parsed_code);
 
-    system.state.line_number = line_index + 1;
-    system.state.current_line = code[line_index];
-
-    std::cout << "Interpreting line " << system.state.line_number << ": '"
-              << system.state.current_line << "'" << std::endl;
-
-    std::vector<hydra::Token> tokens;
-    hydra::ParseResult command_parse_result;
-
-    bool success = lexer.parse_string(system.state.current_line, command_parse_result);
-    if (!success) {
-      std::cerr << "Could not parse command." << std::endl;
-    }
-
-    hydra::Lexer::print_parse_result(command_parse_result);
-
-    std::any interpretation_result;
-
-    if (interpreter.interpret_parse_result(command_parse_result,
-                                           interpretation_result)) {
-      if (interpretation_result.has_value()) {
-        std::cout << "Result has value: ";
-        hydra::Interpreter::print_interpretation_result(interpretation_result);
-        std::cout << std::endl;
-      } else {
-        std::cout << "Could not get interpretation result." << std::endl;
-      }
-    } else {
-      std::cout << "Could not interpret '" << command_parse_result.value
-                << "' successfully." << std::endl;
-    }
-
-    interpreter.print_scopes();
+  /**
+   * Print the parsed code.
+   */
+  #ifdef DEBUG
+  for (const hydra::ParseResult &parsed_line : parsed_code) {
+    std::cout << parsed_line.line_number << "| ";
+    hydra::Lexer::print_parse_result(parsed_line);
   }
+  #endif
 
   return 0;
 }
