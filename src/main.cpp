@@ -62,12 +62,13 @@ int main(int argc, char *argv[]) {
 
   std::vector<std::string> code = {
       "for i in [0.0, 1.0, 3.0] {",
-      "\tprint(message: \"Bow to the mighty Hydra!\")",
-      "\tfor j in [0.0, 1.0, 2.0] {",
+      "\tfor j in [1.0, 1.0, i * i] {",
       "\t\tprint(message: \"-\")",
       "\t}",
+      "\tprint(message: \"> \")",
+      "\tprint(message: \"Bow to the mighty Hydra!\n\")",
       "}",
-      "print(message: \"Done!\")"
+      "print(message: \"Done!\n\")"
                                    // "var a = M_PI * 2.0",
                                    // "var b = 3 * a",
                                    // "var c = random(from: a, to: b)"
@@ -75,7 +76,16 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Interpreting code: " << std::endl << std::endl;
   for (int line = 0; line < (int)code.size(); ++line) {
-    std::cout << line + 1 << "| " << code[line] << std::endl;
+    std::string code_line = code[line];
+
+    int position_of_new_line = code_line.find_first_of("\n");
+
+    while (position_of_new_line != (int)std::string::npos) {
+      code_line.replace(position_of_new_line, 1, "\\n");
+      position_of_new_line = code_line.find_first_of("\n", position_of_new_line);
+    }
+
+    std::cout << line + 1 << "| " << code_line << std::endl;
   }
   std::cout << std::endl;
 
@@ -94,6 +104,14 @@ int main(int argc, char *argv[]) {
     hydra::Lexer::print_parse_result(parsed_line);
   }
   #endif
+
+  /**
+   * Interpret the code.
+   */
+  std::any interpretation_result;
+  if (!interpreter.interpret_code(parsed_code, interpretation_result)) {
+    std::cerr << "Code could not be interpreted..." << std::endl;
+  }
 
   return 0;
 }

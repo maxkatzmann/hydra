@@ -566,8 +566,11 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
   }
 
   /**
-   * If we reach this point, everything went well.
+   * If we reach this point, everything went well. Reset the state
+   * values.
    */
+  this->system.state.line_number = -1;
+  this->system.state.current_line = "";
   return true;
 }
 
@@ -1257,11 +1260,11 @@ bool Lexer::parse_range(const std::vector<Token> &tokens, ParseResult &result) {
   }
 
   /**
-   * A range token has exactly 5 children.
+   * A range token has at least 5 children.
    *
    * 'from , step , to' (5 including commas.)
    */
-  if (tokens[0].children.size() != 5) {
+  if (tokens[0].children.size() < 5) {
     result.type = Error;
     this->system.print_error_message(
         std::string(
@@ -1276,51 +1279,55 @@ bool Lexer::parse_range(const std::vector<Token> &tokens, ParseResult &result) {
   /**
    * Now we parse the three range tokens.
    */
-  for (int index = 0; index < (int)tokens[0].children.size(); ++index) {
+  std::vector<Token> tokens_in_current_range_argument;
+  for (int index = 0; index <= (int)tokens[0].children.size(); ++index) {
 
     /**
-     * Odd positions have to be commas!
+     * If we find a comma or are at the very end of the arguments
+     * vector, all previous tokens from the current argument of the
+     * range. So we parse this argument.
      */
-    if (index % 2 == 1) {
+    if (index == (int)tokens[0].children.size() || tokens[0].children[index].value == ",") {
+      ParseResult current_argument;
+      current_argument.line_number = result.line_number;
 
       /**
-       * Check whether this is a comma.
+       * Check whether we could successfully parse the current
+       * argument.
        */
-      if (tokens[0].children[index].value != ",") {
-        result.type = Error;
-        this->system.print_error_message(
-            std::string("Invalid syntax. Expected ',' but found '") +
-            tokens[0].children[index].value +
-            "' instead. Use '[lowerbound, stepsize, upperbound]' to define a "
-            "range.");
+      if (!parse_tokens(tokens_in_current_range_argument, current_argument)) {
         return false;
       }
 
       /**
-       * We don't need to add the comma as a parse result.
+       * Add the argument to the range.
        */
-      continue;
+      result.children.push_back(current_argument);
+
+      /**
+       * Reset the tokens array so we can use it for the next
+       * argument.
+       */
+      tokens_in_current_range_argument.clear();
+    } else {
+      /**
+       * If we didn't find a comma, we add the token to the current
+       * argument.
+       */
+      tokens_in_current_range_argument.push_back(tokens[0].children[index]);
     }
+  }
 
-    ParseResult range_token_parse_result;
-    range_token_parse_result.line_number = result.line_number; // Pass on line_number.
-
-    /**
-     * Try to parse the token in the range.
-     */
-    bool success =
-        parse_tokens({tokens[0].children[index]}, range_token_parse_result);
-
-    if (!success) {
-      result.type = Error;
-      this->system.print_error_message(std::string("Could not parse range."));
-      return false;
-    }
-
-    /**
-     * Add the parse result as child of the range-parse-result.
-     */
-    result.children.push_back(range_token_parse_result);
+  /**
+   * We now check whether we found exactly 3 arguments. If not
+   * something went wrong.
+   */
+  if (result.children.size() != 3) {
+    this->system.print_error_message(
+        std::string(
+            "Invalid number of arguments in range. Expected 3 but found ") +
+        std::to_string(result.children.size()) + " instead.");
+    return false;
   }
 
   return true;

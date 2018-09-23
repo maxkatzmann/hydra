@@ -89,13 +89,16 @@ System::System() {
 }
 
 void System::print_error_message(const std::string &message) {
-
   if (this->state.line_number >= 0) {
-    std::cerr << "Error in line " << this->state.line_number << ": '"
-              << this->state.current_line << "'." << std::endl;
+    if (!this->state.current_line.empty()) {
+      std::cerr << "Error in line " << this->state.line_number << ": '"
+                << this->state.current_line << "'." << std::endl
+                << "> " << message << std::endl;
+    } else {
+      std::cerr << "Error in line " << this->state.line_number << ": "
+                << message << std::endl;
+    }
   }
-
-  std::cerr << "> " << message << std::endl;
 }
 
 void System::print_argument_list(const std::vector<std::string> &arguments) {

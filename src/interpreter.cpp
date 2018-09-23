@@ -32,38 +32,13 @@ Interpreter::Interpreter(System &system) : system(system) {
       {Initialization, &Interpreter::interpret_initialization},
       {Expression, &Interpreter::interpret_expression},
       {Function, &Interpreter::interpret_function},
+      {Loop, &Interpreter::interpret_loop},
       {Number, &Interpreter::interpret_number},
       {String, &Interpreter::interpret_string},
       {Unknown, &Interpreter::interpret_unknown},
       {Variable, &Interpreter::interpret_variable}
   };
 
-}
-
-bool Interpreter::value_for_variable(const std::string &variable,
-                                     std::any &value) {
-  /**
-   * Reset the value to ensure that the has_value check fails when we
-   * don't find a value.
-   */
-  value.reset();
-
-  DLOG(INFO) << "Looking for variable '" << variable << "' in all scopes."
-             << std::endl;
-
-  for (int i = this->system.state.scopes.size() - 1; i >= 0; --i) {
-    std::unordered_map<std::string, std::any>::const_iterator
-      position_of_variable = this->system.state.scopes[i].find(variable);
-
-    if (position_of_variable != this->system.state.scopes[i].end()) {
-      value = position_of_variable->second;
-      DLOG(INFO) << "Did find variable '" << variable << "' in scope " << i
-                 << "." << std::endl;
-      return true;
-    }
-  }
-
-  return false;
 }
 
 bool Interpreter::number_from_value(const std::any &value, double &number) {
@@ -73,22 +48,6 @@ bool Interpreter::number_from_value(const std::any &value, double &number) {
     return true;
   } catch (std::bad_any_cast &bac) {
     return false;
-  }
-}
-
-void Interpreter::value_for_variable_in_current_scope(
-    const std::string &variable, std::any &value) {
-  DLOG(INFO) << "Looking for variable '" << variable
-            << "' in current scope. (There are "
-            << this->system.state.scopes.size() << " scopes)." << std::endl;
-
-  std::unordered_map<std::string, std::any>::const_iterator
-    position_of_variable = this->system.state.scopes.back().find(variable);
-
-  if (position_of_variable != this->system.state.scopes.back().end()) {
-    value = position_of_variable->second;
-    DLOG(INFO) << "Did find variable '" << variable << "' in current scope."
-               << std::endl;
   }
 }
 
@@ -107,10 +66,42 @@ bool Interpreter::parse_result_is_valid(const ParseResult &result) {
   return true;
 }
 
+bool Interpreter::interpret_code(const std::vector<ParseResult> &code,
+                                 std::any &result) {
+  /**
+   * Interpret the ParseResults one after another.
+   */
+  for (const ParseResult &parsed_code : code) {
+
+    /**
+     * Try to interpret the parsed_code. If it fails, return false.
+     */
+    if (!interpret_parse_result(parsed_code, result)) {
+      return false;
+    }
+  }
+
+  /**
+   * When we reach this point, everything went as expected.
+   */
+  return true;
+}
+
 bool Interpreter::interpret_parse_result(const ParseResult &input,
                                          std::any &result) {
   DLOG(INFO) << "Interpreting parse result of type: '" << System::name_for_type.at(input.type)
              << "'." << std::endl;
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
 
   if (input.type == Error) {
     this->system.print_error_message(
@@ -148,6 +139,12 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
    * Reset the result so the check for has_value fails.
    */
   result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
 
   if (!parse_result_is_valid(input)) {
     this->system.print_error_message(
@@ -213,22 +210,6 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
     }
 
     /**
-     * First check whether the variable is not yet written.
-     */
-    std::any already_defined_value;
-    value_for_variable_in_current_scope(input.children[1].value,
-                                        already_defined_value);
-
-    /**
-     * Make sure the variable is not defined already.
-     */
-    if (already_defined_value.has_value()) {
-      this->system.print_error_message(std::string("Redefinition of : '") +
-                                       input.children[1].value + "'.");
-      return false;
-    }
-
-    /**
      * The value is not defined yet. Now we have to interpret
      * what is being assigned.
      */
@@ -242,19 +223,36 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
       DLOG(INFO) << "Assignment value interpreted successfully." << std::endl;
 
       /**
-       * Check whether we actually got a value from the
-       * interpretation.
+       * Actually defining the variable.
        */
-      if (value_interpretation_result.has_value()) {
+      if (!this->system.state.define_variable_with_value(
+              input.children[1].value, value_interpretation_result)) {
         /**
-         * Finish the assignment by adding the variable to the
-         * current scope.
+         * Defining the variable can fail for two reasons. Either the
+         * value didn't actually have a value, or the variable was
+         * defined already..
          */
-        this->system.state.scopes.back()[input.children[1].value] =
-            value_interpretation_result;
-        result = value_interpretation_result;
-        return true;
+        if (!value_interpretation_result.has_value()) {
+          this->system.print_error_message(
+              std::string("Could not define '") + input.children[1].value +
+              "'. Right hand side of assignment did not have a value.");
+        } else {
+          /**
+           * If we did have a value but definition failed, then it was
+           * because the variable already existed.
+           */
+          this->system.print_error_message(std::string("Redefinition of : '") +
+                                           input.children[1].value + "'.");
+        }
+
+        return false;
       }
+
+      /**
+       * Everything worked as expected.
+       */
+      result = value_interpretation_result;
+      return true;
     }
   } else {
     /**
@@ -267,22 +265,7 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
      */
     if (input.children.size() != 2) {
       this->system.print_error_message(
-          std::string("Invalid assignment. Use 'var a = 5.0' instead."));
-      return false;
-    }
-
-    /**
-     * We now check whether the variable is already defined.
-     */
-    std::any current_value;
-    this->value_for_variable(input.children[0].value, current_value);
-
-    if (!current_value.has_value()) {
-      this->system.print_error_message(
-          std::string(
-              "Trying to assign to undefined variable. Define the variable "
-              "first using 'var ") +
-          input.children[0].value + " = ...' instead.");
+          std::string("Invalid assignment. Use 'a = 5.0' instead."));
       return false;
     }
 
@@ -300,19 +283,39 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
       DLOG(INFO) << "Assignment value interpreted successfully." << std::endl;
 
       /**
-       * Check whether we actually got a value from the
-       * interpretation.
+       * Check whether the variable could be assigned successfully.
        */
-      if (value_interpretation_result.has_value()) {
+      if (!this->system.state.set_value_for_variable(
+              input.children[0].value, value_interpretation_result)) {
         /**
-         * Finish the assignment by adding the variable to the
-         * current scope.
+         * If the assignment fails, there are two reasons. Either the
+         * value was empty, or the variable was undefined.
          */
-        this->system.state.scopes.back()[input.children[0].value] =
-            value_interpretation_result;
-        result = value_interpretation_result;
-        return true;
+        /**
+         * Check whether we actually got a value from the
+         * interpretation.
+         */
+        if (!value_interpretation_result.has_value()) {
+          this->system.print_error_message(
+              std::string("Could not define '") + input.children[0].value +
+              "'. Right hand side of assignment did not have a value.");
+        } else {
+          /**
+           * If the result had a value, then the assignment failed
+           * because the variable was not defined yet.
+           */
+          this->system.print_error_message(
+              std::string(
+                  "Trying to assign to undefined variable. Define the variable "
+                  "first using 'var ") +
+              input.children[0].value + " = ...' instead.");
+        }
+
+        return false;
       }
+
+      result = value_interpretation_result;
+      return true;
     }
   }
 
@@ -329,6 +332,233 @@ bool Interpreter::interpret_initialization(const ParseResult &input,
    */
   result.reset();
 
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
+
+  return true;
+}
+
+bool Interpreter::interpret_loop(const ParseResult &loop, std::any &result) {
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = loop.line_number;
+
+  /**
+   * Check whether we're actually dealing with a loop.
+   */
+  if (loop.type != Loop) {
+    this->system.print_error_message(std::string("Unexpectedly found '") +
+                                     System::name_for_type.at(loop.type) +
+                                     "' instead.");
+    return false;
+  }
+
+  /**
+   * The children of a loop parse result are the following:
+   *
+   * the loop variable
+   * the range
+   * the statements in the loop.
+   *
+   * This means, if we don't have at least 3 children, something is
+   * wrong.
+   */
+  if (loop.children.size() < 3) {
+    this->system.print_error_message(
+        std::string("Invalid number of arguments for loop."));
+    return false;
+  }
+
+  /**
+   * We open a new scope, since all variables defined in the loop (as
+   * well as the loop variable) will be forgotten after the loop.
+   */
+  this->system.state.open_new_scope();
+
+  /**
+   * The first child of the loop-parse-result is the variable
+   * name.
+   */
+  if (loop.children[0].type != Unknown && loop.children[0].type != Variable) {
+    this->system.print_error_message(
+        std::string(
+            "Invalid syntax in loop definition. Expected variable name but found '") +
+        System::name_for_type.at(loop.children[0].type) + "' instead.");
+    return false;
+  }
+
+  /**
+   * Get the loop variable name.
+   */
+  std::string loop_variable_name = loop.children[0].value;
+
+  /**
+   * The next child should be the range.
+   */
+  if (loop.children[1].type != Range) {
+    this->system.print_error_message(
+        std::string(
+            "Invalid syntax in loop definition. Expected Range but found '") +
+        System::name_for_type.at(loop.children[1].type) + "' instead.");
+    return false;
+  }
+
+  /**
+   * The range should have exactly 3 children.
+   *
+   * lowerbound stepsize upperbound
+   */
+  if (loop.children[1].children.size() != 3) {
+    this->system.print_error_message(
+        std::string("Invalid number of argument in range definition. Expected "
+                    "3 arguments but found ") +
+        std::to_string(loop.children[1].children.size()) + "' instead.");
+    return false;
+  }
+
+  /**
+   * Interpret the lower bound of the range.
+   */
+  std::any lower_bound_result;
+  double lower_bound;
+  if (!(interpret_parse_result(loop.children[1].children[0],
+                               lower_bound_result) &&
+        number_from_value(lower_bound_result, lower_bound))) {
+    this->system.print_error_message(std::string(
+        "Interpretation failed. Could not interpret lower bound of range."));
+    return false;
+  }
+
+  /**
+   * Interpret the step size of the range.
+   */
+  std::any step_size_result;
+  double step_size;
+  if (!(interpret_parse_result(loop.children[1].children[1],
+                               step_size_result) &&
+        number_from_value(step_size_result, step_size))) {
+    this->system.print_error_message(std::string(
+        "Interpretation failed. Could not interpret step size of range."));
+    return false;
+  }
+
+  /**
+   * Interpret the upper bound of the range.
+   */
+  std::any upper_bound_result;
+  double upper_bound;
+  if (!(interpret_parse_result(loop.children[1].children[2],
+                               upper_bound_result) &&
+        number_from_value(upper_bound_result, upper_bound))) {
+    this->system.print_error_message(std::string(
+        "Interpretation failed. Could not interpret upper bound of range."));
+    return false;
+  }
+
+  /**
+   * At this point we interpreted the whole range. Now we actually
+   * loop.
+   *
+   * We start by assigning the lower_bound to the loop variable in the
+   * current scope.
+   */
+  double loop_variable = lower_bound;
+  std::any loop_variable_value = loop_variable;
+  this->system.state.define_variable_with_value(loop_variable_name,
+                                                loop_variable_value);
+
+  /**
+   * Now loop! We loop as long as the loop variable is smaller than
+   * the upper bound.
+   */
+
+  DLOG(INFO) << "Loop variable is " << loop_variable << ", upper bound is "
+             << upper_bound << std::endl;
+
+  while (loop_variable <= upper_bound) {
+    /**
+     * Interpret the code within the loop. Since the first to children
+     * of the loop are variable name and range, this leaves all later
+     * children as contents of the loop.
+     */
+    DLOG(INFO) << "Interpreting loop with variable " << loop_variable_name
+               << " = " << loop_variable << std::endl;
+    for (int index = 2; index < (int)loop.children.size(); ++index) {
+      /**
+       * If interpreting this ParseResult fails, the whole loop fails.
+       */
+      std::any interpretation_result;
+      if (!interpret_parse_result(loop.children[index], interpretation_result)) {
+        return false;
+      }
+    }
+
+    /**
+     * The code in the loop was interpreted successfully. Now we
+     * determine the value of the loop variable, which might have
+     * changed during the loop and then update it by increasing it by
+     * the step size.
+     */
+
+    /**
+     * First check whether we can get the value for the loop
+     * variable. We only allow to take the variable from the current
+     * scope.
+     */
+    if (!this->system.state.value_for_variable_in_current_scope(
+            loop_variable_name, loop_variable_value) &&
+        number_from_value(loop_variable_value, loop_variable)) {
+      this->system.print_error_message(
+          std::string("Could not interpret loop. Loop variable '") +
+          loop_variable_name + "' could not be interpreted as number.");
+      return false;
+    }
+
+    /**
+     * The loop_variable now has the current value. Update it by
+     * increasing it by the step_size.
+     */
+    loop_variable += step_size;
+
+    /**
+     * Now we set the new value in the current scope.
+     */
+    loop_variable_value = loop_variable;
+    if (!this->system.state.set_value_for_variable(loop_variable_name,
+                                                   loop_variable_value)) {
+      this->system.print_error_message(
+          std::string(
+              "Could not interpret loop. Unable to update loop variable '") +
+          loop_variable_name + "'.");
+      return false;
+    }
+  }
+
+  /**
+   * We're done interpreting the loop. We now remove the scope of the
+   * loop including all the variables defined in there.
+   */
+  if (!this->system.state.close_scope()) {
+    this->system.print_error_message(
+        std::string("Could not close loop-scope as that would mean closing the "
+                    "last scope."));
+    return false;
+  }
+
+  /**
+   * If we get here, everything went as expected.
+   */
   return true;
 }
 
@@ -341,6 +571,12 @@ bool Interpreter::interpret_number(const ParseResult &input, std::any &result) {
    * Reset the result so the check for has_value fails.
    */
   result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
 
   try {
     double value = stod(input.value);
@@ -376,6 +612,17 @@ bool Interpreter::interpret_string(const ParseResult &input, std::any &result) {
   /**
    * Reset the result so the check for has_value fails.
    */
+  result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
   if (input.type != String) {
     this->system.print_error_message(
         std::string("Interpretation failed. Unexpectedly found '") +
@@ -390,6 +637,18 @@ bool Interpreter::interpret_string(const ParseResult &input, std::any &result) {
 
 bool Interpreter::interpret_unknown(const ParseResult &input,
                                     std::any &result) {
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
+
   /**
    * If the input type is unknown we check whether it might be a
    * variable.  (The lexer doesn't know about the defined variables.)
@@ -425,6 +684,12 @@ bool Interpreter::interpret_expression(const ParseResult &input,
    * Reset the result so the check for has_value fails.
    */
   result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
 
   /**
    * A mathematical expression consists of statements that evaluate to
@@ -817,9 +1082,15 @@ bool Interpreter::interpret_variable(const ParseResult &input,
   result.reset();
 
   /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = input.line_number;
+
+  /**
    * We now check whether the variable is defined.
    */
-  bool success = this->value_for_variable(input.value, result);
+  bool success = this->system.state.value_for_variable(input.value, result);
 
   if (!success) {
     this->system.print_error_message(
@@ -840,6 +1111,13 @@ bool Interpreter::interpret_function(const ParseResult &function_call,
    * Reset the result so the check for has_value fails.
    */
   result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = function_call.line_number;
+
   /**
    * We check whether we know this function and start the
    * corresponding interpretation.
@@ -889,6 +1167,12 @@ bool Interpreter::interpret_arguments_from_function_call(
 
   DLOG(INFO) << "Interpreting arguments from function call '"
              << function_call.value << "'." << std::endl;
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = function_call.line_number;
 
   /**
    * The input value should be the ParseResult containing the whole

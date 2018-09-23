@@ -58,30 +58,20 @@ namespace hydra {
         builtin_functions;
 
     /**
-     * Determines the value for a variable and stores the result in
-     * value.  If no value could be determined value_for_variable
-     * returns false and value.has_value() returns false.
-     */
-    bool value_for_variable(const std::string &variable, std::any &value);
-
-    /**
      * Tries to cast a value to double. Returns false if the cast
      * failed.
      */
     bool number_from_value(const std::any &value, double &number);
 
     /**
-     * Determines the value for a variable in the current scope and
-     * stores the result in value.  If no value could be determined,
-     * value.has_value() returns false.
-     */
-    void value_for_variable_in_current_scope(const std::string &variable,
-                                             std::any &value);
-
-    /**
      * Returns if a parse result contains an error.
      */
     bool parse_result_is_valid(const ParseResult &result);
+
+    /**
+     * Interprets a series of ParseResults.
+     */
+    bool interpret_code(const std::vector<ParseResult> &code, std::any &result);
 
     /**
      * Interprets a parse result.  Returns false if an error occurred
@@ -112,11 +102,18 @@ namespace hydra {
     bool interpret_expression(const ParseResult &input, std::any &result);
 
     /**
-     * Interprets a function.  Returns false if an
-     * error occurred during interpretation.  The result contains the
-     * value of the interpretation.
+     * Interprets a function.  Returns false if an error occurred
+     * during interpretation.  The result contains the value of the
+     * interpretation.
      */
     bool interpret_function(const ParseResult &function_call, std::any &result);
+
+    /**
+     * Interprets a loop.  Returns false if an error occurred during
+     * interpretation.  The result contains the value of the
+     * interpretation.
+     */
+    bool interpret_loop(const ParseResult &loop, std::any &result);
 
     /**
      * Interprets a number.  Returns false if an error occurred during
