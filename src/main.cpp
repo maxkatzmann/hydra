@@ -61,17 +61,15 @@ int main(int argc, char *argv[]) {
   //     "var o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
 
   std::vector<std::string> code = {
-      "for i in [0.0, 1.0, 3.0] {",
-      "\tfor j in [1.0, 1.0, i * i] {",
-      "\t\tprint(message: \"-\")",
-      "\t}",
-      "\tprint(message: \"> \")",
-      "\tprint(message: \"Bow to the mighty Hydra!\n\")",
-      "}",
-      "print(message: \"Done!\n\")"
-                                   // "var a = M_PI * 2.0",
-                                   // "var b = 3 * a",
-                                   // "var c = random(from: a, to: b)"
+      // "for i in [0.0, 1.0, 3.0] {",
+      // "\tfor j in [1.0, 1.0, i * i] {",
+      // "\t\tprint(message: \"-\")",
+      // "\t}",
+      // "\tprint(message: \"> \")",
+      // "\tprint(message: \"Bow to the mighty Hydra!\n\")",
+      // "}",
+      // "print(message: \"Done!\n\")"
+                                   "var a = Pol(r: 1.0, phi: M_PI / 2)"
   };
 
   std::cout << "Interpreting code: " << std::endl << std::endl;
@@ -112,6 +110,10 @@ int main(int argc, char *argv[]) {
   if (!interpreter.interpret_code(parsed_code, interpretation_result)) {
     std::cerr << "Code could not be interpreted..." << std::endl;
   }
+
+  #ifdef DEBUG
+  interpreter.print_scopes();
+  #endif
 
   return 0;
 }

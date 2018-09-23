@@ -88,13 +88,6 @@ namespace hydra {
     bool interpret_assignment(const ParseResult &input, std::any &result);
 
     /**
-     * Interprets an initialization.  Returns false if an error
-     * occurred during interpretation.  The result contains the value
-     * of the interpretation.
-     */
-    bool interpret_initialization(const ParseResult &input, std::any &result);
-
-    /**
      * Interprets a mathematical expression.  Returns false if an
      * error occurred during interpretation.  The result contains the
      * value of the interpretation.
@@ -107,6 +100,14 @@ namespace hydra {
      * interpretation.
      */
     bool interpret_function(const ParseResult &function_call, std::any &result);
+
+    /**
+     * Interprets an initialization.  Returns false if an error
+     * occurred during interpretation.  The result contains the value
+     * of the interpretation.
+     */
+    bool interpret_initialization(const ParseResult &initialization,
+                                  std::any &result);
 
     /**
      * Interprets a loop.  Returns false if an error occurred during

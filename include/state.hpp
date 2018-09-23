@@ -19,6 +19,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <canvas.hpp>
+
 namespace hydra {
 /**
  * Used to store a state of a hydra program. E.g., the current line
@@ -80,6 +82,7 @@ class State {
    */
   bool value_for_variable_in_current_scope(const std::string &variable,
                                            std::any &value);
+
 };
 }  // namespace hydra
 

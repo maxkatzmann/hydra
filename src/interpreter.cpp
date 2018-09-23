@@ -7,6 +7,7 @@
 
 #include <interpreter.hpp>
 #include <lexer.hpp>
+#include <canvas.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -322,9 +323,9 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
   return false;
 }
 
-bool Interpreter::interpret_initialization(const ParseResult &input,
+bool Interpreter::interpret_initialization(const ParseResult &initialization,
                                            std::any &result) {
-  DLOG(INFO) << "Interpreting initialization with value: '" << input.value
+  DLOG(INFO) << "Interpreting initialization with value: '" << initialization.value
              << "'." << std::endl;
 
   /**
@@ -336,9 +337,87 @@ bool Interpreter::interpret_initialization(const ParseResult &input,
    * Let the system state now, which line we're currently
    * interpreting.
    */
-  this->system.state.line_number = input.line_number;
+  this->system.state.line_number = initialization.line_number;
 
-  return true;
+  /**
+   * Check whether the input is actually an initialization.
+   */
+  if (initialization.type != Initialization) {
+    this->system.print_error_message(
+        std::string("Unexpectedly found '") +
+        System::name_for_type.at(initialization.type) +
+        "' while interpreting initialization.");
+    return false;
+  }
+
+  /**
+   * First we try to get the arguments for the initialization. This
+   * works the same way as with function arguments.
+   *
+   * The initialization should have exactly one child: the argument
+   * list.
+   */
+  if (initialization.children.size() != 1) {
+    this->system.print_error_message(
+        std::string("Invalid number of arguments in initialization. Expected "
+                    "one but found ") +
+        std::to_string(initialization.children.size()) + " instead.");
+    return false;
+  }
+
+  /**
+   * Check whether the single child is an ArgumentList.
+   */
+  if (initialization.children[0].type != ArgumentList) {
+    this->system.print_error_message(
+        std::string("Unexpectedly found ") +
+        System::name_for_type.at(initialization.children[0].type) +
+        " while interpreting argument list.");
+    return false;
+  }
+
+  /**
+   * Now we actually interpret the argument list.
+   */
+  std::unordered_map<std::string, std::any> arguments;
+  interpret_arguments_from_function_call(initialization, arguments);
+
+  /**
+   * Now depending on which type to evaluate we initialize it.
+   */
+
+  /**
+   * Evaluating Pol (Polar coordinates).
+   */
+  if (initialization.value == "Pol") {
+
+    /**
+     * Get the actual argument values.
+     */
+    double r;
+    double phi;
+
+    /**
+     * Get the numbers for the parameters.
+     */
+    if (!number_value_for_parameter("r", arguments, r) ||
+        !number_value_for_parameter("phi", arguments, phi)) {
+      return false;
+    }
+
+    /**
+     * If we're at this point, we all we need for the initialization.
+     */
+    result = Pol(r, phi);
+    return true;
+  } else {
+    this->system.print_error_message(std::string("Could not interpret '") +
+                                     initialization.value +
+                                     "'. No initialization definition found.");
+    return false;
+  }
+
+  return false;
 }
 
 bool Interpreter::interpret_loop(const ParseResult &loop, std::any &result) {
@@ -1176,9 +1255,9 @@ bool Interpreter::interpret_arguments_from_function_call(
 
   /**
    * The input value should be the ParseResult containing the whole
-   * function call.
+   * function call / initialization.
    */
-  if (function_call.type != Function) {
+  if (function_call.type != Function && function_call.type != Initialization) {
     this->system.print_error_message(
         std::string("Unexpectedly found '") +
         System::name_for_type.at(function_call.type) +
@@ -1314,8 +1393,9 @@ bool Interpreter::number_value_for_parameter(
                                      argument_value) &&
         number_from_value(argument_value, value))) {
     this->system.print_error_message(
-        std::string("Could not interpret function . Argument for "
-                    "parameter '") +
+        std::string(
+            "Could not interpret function / initialization. Argument for "
+            "parameter '") +
         parameter + "' could not be interpreted as number.");
     return false;
   }
@@ -1354,11 +1434,22 @@ bool Interpreter::string_value_for_parameter(
 
 bool Interpreter::print_interpretation_result(const std::any &result) {
 
+  /**
+   * Check whether it is a double.
+   */
   try {
     std::cout << std::any_cast<double>(result);
     return true;
   } catch (const std::bad_any_cast& e) {} // Don't do anything when
                                           // the cast failed.
+
+  /**
+   * Check whether is a Pol object.
+   */
+  try {
+    std::cout << std::any_cast<Pol>(result);
+    return true;
+  } catch ( const std::bad_any_cast &bac) {}
 
   return false;
 }
@@ -1390,7 +1481,8 @@ void Interpreter::print_scope_at_index(int index) {
 
   for (int i = 0; i < (int)keys.size(); ++i) {
     std::cout << "  [" << i << "] " << keys[i] << " = '";
-    Interpreter::print_interpretation_result(this->system.state.scopes[index].at(keys[i]));
+    Interpreter::print_interpretation_result(
+        this->system.state.scopes[index].at(keys[i]));
     std::cout << "'" << std::endl;
   }
 }

@@ -1012,8 +1012,8 @@ bool Lexer::parse_initialization(const std::vector<Token> &tokens,
       result.type = Error;
 
       this->system.print_error_message(
-                                       std::string("Missing arguments during initialization of '") +
-                                       tokens[0].value + "'.");
+          std::string("Missing arguments during initialization of '") +
+          tokens[0].value + "'.");
       std::cerr << "> Usage of '" << tokens[0].value << "': " << tokens[0].value
                 << "(";
       System::print_argument_list(position_of_arguments->second.arguments);
