@@ -207,6 +207,13 @@ namespace hydra {
     bool function_sinh(const ParseResult &function_call, std::any &result);
 
     /**
+     * Determines the string representation of an interpretation
+     * result. Returns false if no representation could be obtained.
+     */
+    static bool string_representation_of_interpretation_result(
+        const std::any &result, std::string &str);
+
+    /**
      * Tries to find out what type the result is and cast it in order
      * to print it.
      */

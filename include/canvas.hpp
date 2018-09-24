@@ -15,6 +15,7 @@
 #define canvas_hpp
 
 #include <iostream>
+#include <string>
 
 namespace hydra {
 
@@ -33,9 +34,13 @@ namespace hydra {
     double phi = 0.0;
 
     friend std::ostream &operator<<(std::ostream &os, const Pol &p) {
-      return os << "Pol(" << p.r << ", " << p.phi << ")";
+      return os << p.to_string();
     }
 
+    std::string to_string() const {
+      return std::string("Pol(") + std::to_string(this->r) + ", " +
+             std::to_string(this->phi) + ")";
+    }
   };
 }
 

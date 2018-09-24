@@ -105,12 +105,15 @@ class Lexer {
   static bool is_string_empty(std::string &str);
 
   /**
-   * Finds the matching bracket to the one specified at position and
+   * Finds the matching bracket to the one specified, starting from the position and
    * returns its index.  If the matching bracket was not found,
    * std::string::npos is returned.
+   *
+   * We explicitly specify the opening bracket as there are cases,
+   * where this is NOT the one that is at the passed position.
    */
-  static int position_of_matching_bracket_for_position(const std::string &str,
-                                                       int position);
+  static int position_of_matching_bracket_for_position(
+      const std::string &str, const char opening_bracket, int position);
 
   /**
    * Finds the matching '"' to the one at the specified position and

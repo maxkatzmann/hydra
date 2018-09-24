@@ -110,9 +110,8 @@ bool Lexer::is_string_empty(std::string &str) {
 }
 
 int Lexer::position_of_matching_bracket_for_position(const std::string &str,
+                                                     const char opening_bracket,
                                                      int position) {
-  const char opening_bracket = str[position];
-
   const std::unordered_map<char, char> bracket_pairs = {{'(', ')'}, {'[', ']'}, {'{', '}'}, {'"', '"'}};
 
   const char closing_bracket = bracket_pairs.at(opening_bracket);
@@ -211,7 +210,7 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
        * Find the matching bracket.
        */
       int matching_bracket = Lexer::position_of_matching_bracket_for_position(
-          cleaned_string, current_index);
+          cleaned_string, cleaned_string[current_index], current_index);
 
       /**
        * If we didn't find a matching bracket, we have an error.
@@ -291,10 +290,143 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
        */
       int matching_quote = Lexer::position_of_matching_quote_for_position(
           cleaned_string, current_index);
-      Token string_token(
-          cleaned_string.substr(current_index + 1,
-                                matching_quote - (current_index + 1)),
-          String);
+
+      std::string string_content = cleaned_string.substr(
+          current_index + 1, matching_quote - (current_index + 1));
+
+      /**
+       * Creating the token.
+       */
+      Token string_token(string_content, String);
+
+      /**
+       * Now we check whether there are escapes within the string.
+       *
+       * For this we keep track of where the last escape ended. So
+       * that we can add the content in between as normal string
+       * content.
+       *
+       * Since we start to gather the string right after the position
+       * of the last escape (+1) but we initially start want to start
+       * our string at 0, we have -1 here.
+       */
+      int position_of_last_escape_end = -1;
+      int position_of_escape = string_content.find_first_of("\(");
+
+      DLOG(INFO) << "Found escape at position: " << position_of_escape
+                 << std::endl;
+
+
+      /**
+       * As long as we find an escape, we identify the part within the
+       * escape and parse these contents.
+       */
+      while (position_of_escape != (int)std::string::npos) {
+
+        /**
+         * If we found an escape character, we add the part of the
+         * string before the escape as a child of the string token.
+         */
+        std::string previous_string_part = string_content.substr(
+            position_of_last_escape_end + 1,
+            position_of_escape - (position_of_last_escape_end + 2));
+
+        /**
+         * Add the previous part of the token if its not empty.
+         */
+        if (!previous_string_part.empty()) {
+          Token previous_part_token(previous_string_part, String);
+          string_token.children.push_back(previous_part_token);
+        }
+
+        /**
+         * Find the parenthesis closing this escape marker.
+         */
+        int position_of_matching_bracket =
+            position_of_matching_bracket_for_position(string_content, '(',
+                                                      position_of_escape + 1);
+
+        DLOG(INFO) << "Position of escape closing bracket: "
+                   << position_of_matching_bracket << std::endl;
+
+        /**
+         * Check whether the matching bracket was found.
+         */
+        if (position_of_matching_bracket == (int)std::string::npos) {
+          this->system.print_error_message(
+              std::string("Invalid syntax. Could not find matching bracket for "
+                          "'\\(' at character index ") +
+              std::to_string(position_of_escape) + ".");
+          return false;
+        }
+
+        /**
+         * Get the string representing the content within the escape.
+         */
+        std::string escaped_content = string_content.substr(
+            position_of_escape + 1,
+            position_of_matching_bracket - (position_of_escape + 1));
+
+        DLOG(INFO) << "Found escaped content: '" << escaped_content << "'"
+                   << std::endl;
+
+        /**
+         * We now create a new string escape token that becomes a
+         * child from the string token.
+         *
+         * Then we tokenize the string within this escape part into
+         * the children of that escaped_content token.
+         */
+        Token escape_token(escaped_content, StringEscape);
+        tokenize_string(escaped_content, escape_token.children);
+
+        /**
+         * Add the escape_token as child of the string_token.
+         */
+        string_token.children.push_back(escape_token);
+
+        /**
+         * If we're at the end of the string we can just stop looking
+         * for escape markers now.
+         */
+        if (position_of_matching_bracket >= (int)string_content.length()) {
+          break;
+        }
+
+        /**
+         * Keep track of where the last escape ended.
+         */
+        position_of_last_escape_end = position_of_matching_bracket;
+
+        /**
+         * Now we update the position_of_escape with the position of
+         * the next escape marker.
+         */
+        position_of_escape = string_content.find_first_of(
+            "\(", position_of_matching_bracket + 1);
+
+        /**
+         * If we don't have another escape part, we simply add the
+         * remainder of the string as last string part.
+         */
+        if (position_of_escape == (int)std::string::npos) {
+          /**
+           * If we could not find a new escape marker, we simply add the
+           * remainder of the string as child of the current
+           * string_token.
+           */
+          std::string last_string_part =
+            string_content.substr(position_of_matching_bracket + 1);
+
+          /**
+           * Add the last string part if its not empty.
+           */
+          if (!last_string_part.empty()) {
+            Token last_part_token(last_string_part, String);
+            string_token.children.push_back(last_part_token);
+          }
+        }
+      }
 
       /**
        * Add the string token.
@@ -712,6 +844,7 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
        * Add the parsed result.
        */
       ParseResult assignment_variable(Variable, lhs[0].value);
+      assignment_variable.line_number = result.line_number;
       result.children.push_back(assignment_variable);
     } else {
       result.type = Error;
@@ -755,7 +888,9 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
      * Everything went as expected.
      */
     ParseResult assignment_keyword(Assignment, lhs[0].value);
+    assignment_keyword.line_number = result.line_number;
     ParseResult assignment_variable(Variable, lhs[1].value);
+    assignment_variable.line_number = result.line_number;
 
     result.children.push_back(assignment_keyword);
     result.children.push_back(assignment_variable);
@@ -773,6 +908,7 @@ bool Lexer::parse_assignment(const std::vector<Token> &tokens,
    * was parsed correctly.)
    */
   ParseResult rhs_result;
+  rhs_result.line_number = result.line_number;
   bool success = parse_tokens(rhs, rhs_result);
   result.children.push_back(rhs_result);
 
@@ -1358,8 +1494,97 @@ bool Lexer::parse_string_token(const std::vector<Token> &tokens,
     return false;
   }
 
+  /**
+   * At this point we're sure that we have a string. It remains to
+   * check whether there are escapes in there.
+   */
   result.type = String;
   result.value = tokens[0].value;
+
+  /**
+   * If there are no children, we don't have escapes and simply pass
+   * on the string value.
+   */
+  if (tokens[0].children.empty()) {
+    return true;
+  }
+
+  /**
+   * If a string contains escapes, then the actual string value is
+   * irrelevant, and we have to put the string together from the child
+   * tokens.
+   */
+  int escape_index = 0; // Used for better error messages.
+
+  for (const Token &child : tokens[0].children) {
+
+    if (child.type == String) {
+      ParseResult string_token_parse_result;
+      string_token_parse_result.line_number = result.line_number;
+
+      /**
+       * Try to parse the string.
+       */
+      if (!parse_string_token({child}, string_token_parse_result)) {
+        result.type = Error;
+        return false;
+      }
+
+      /**
+       * Add the token.
+       */
+      result.children.push_back(string_token_parse_result);
+
+      /**
+       * If the token is not a String, it might be a StringEscape.
+       */
+    } else if (child.type == StringEscape) {
+
+      /**
+       * We just found a new StringEscape.
+       */
+      ++escape_index;
+
+      /**
+       * If the StringEscape does not have a content, something went
+       * wrong.
+       */
+      if (child.children.empty()) {
+        result.type = Error;
+        this->system.print_error_message(
+            std::string("Invalid syntax. Escape sequence .") +
+            std::to_string(escape_index) + " is empty.");
+        return false;
+      }
+
+      /**
+       * Parse the contents of the StringEscape.
+       */
+      ParseResult string_escape_parse_result;
+      string_escape_parse_result.line_number = result.line_number;
+
+      /**
+       * Try to parse the content of the escape.
+       */
+      if (!parse_tokens(child.children, string_escape_parse_result)) {
+        result.type = Error;
+        this->system.print_error_message(
+            std::string("Could not parse escape sequence ") +
+            std::to_string(escape_index) + ".");
+        return false;
+      }
+
+      /**
+       * Add the ParseResult as child of the overall result.
+       */
+      result.children.push_back(string_escape_parse_result);
+    }
+  }
+
+  /**
+   * If we reach this point without failing, everything went as
+   * expected.
+   */
   return true;
 }
 
@@ -1554,7 +1779,7 @@ void Lexer::print_parse_result(const ParseResult &result,
 void Lexer::print_tokenized_string(const std::vector<Token> &tokenized_string,
                                    const std::string &indentation) {
   for (const Token &token : tokenized_string) {
-    std::cout << indentation << token.value << " ("
+    std::cout << indentation << "'" << token.value << "' ("
               << System::name_for_type.at(token.type) << ")" << std::endl;
     Lexer::print_tokenized_string(token.children, indentation + "\t");
   }

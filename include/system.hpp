@@ -38,8 +38,9 @@ enum Type {
   Parenthesis = 11,
   Range = 12,
   String = 13,
-  Unknown = 14,
-  Variable = 15
+  StringEscape = 14,
+  Unknown = 15,
+  Variable = 16
 };
 
 /**

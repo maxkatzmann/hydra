@@ -29,6 +29,7 @@ const std::unordered_map<Type, std::string, std::hash<int>>
         {Parenthesis, "Parenthesis"},
         {Range, "Range"},
         {String, "String"},
+        {StringEscape, "StringEscape"},
         {Unknown, "Unknown"},
         {Variable, "Variable"}};
 

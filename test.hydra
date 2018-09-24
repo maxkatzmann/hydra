@@ -18,7 +18,7 @@ let o = Pol(r: 0.0, phi: 0.0)
 point(center: o, radius: 0.3)
 
 // Draw a line
-line(from: o, to: (5.0, M_PI / 2.0)) // <- Recognizes that "to" parameter is not a variable and uses values directly)
+line(from: o, to: Pol(5.0, M_PI / 2.0))
 
 let r = random(from: 0.0, to: 10.0)
 let p = Pol(r: r, phi: random(from: 0.0, to: M_PI / 2.0))

@@ -69,7 +69,10 @@ int main(int argc, char *argv[]) {
       // "\tprint(message: \"Bow to the mighty Hydra!\n\")",
       // "}",
       // "print(message: \"Done!\n\")"
-                                   "var a = Pol(r: 1.0, phi: M_PI / 2)"
+                                   "var a = 5.0",
+                                   "print(message: \"Five is \\(a) and Two times Five is \\(2.0 * a)\")",
+                                   "print(message: \"Fiveteen is \\(1.0)\\(a)\")",
+                                   "print(message: \"\\(M_PI) tastes great!\")"
   };
 
   std::cout << "Interpreting code: " << std::endl << std::endl;

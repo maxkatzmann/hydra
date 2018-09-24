@@ -710,7 +710,59 @@ bool Interpreter::interpret_string(const ParseResult &input, std::any &result) {
     return false;
   }
 
-  result = input.value;
+  /**
+   * Now we check if the string contains escape sequences. If the
+   * string has children, its children form the actual string.
+   */
+
+  if (input.children.empty()) {
+    result = input.value;
+    return true;
+  }
+
+  /**
+   * If we end up here, the string has children, which means that the
+   * children form the actual string.
+   */
+  std::string final_string;
+
+  /**
+   * We iterate the parts of the string and try to evaluate each as
+   * string.
+   */
+  for (const ParseResult &string_part : input.children) {
+
+    /**
+     * Try to interpret this string part.
+     */
+    std::any string_part_value;
+    if (!interpret_parse_result(string_part, string_part_value)) {
+      return false;
+    }
+
+    /**
+     * We have the value. We now check whether we can get a string
+     * representation.
+     */
+    std::string string_representation;
+    if (!Interpreter::string_representation_of_interpretation_result(
+            string_part_value, string_representation)) {
+      this->system.print_error_message(std::string("Interpretation failed. '") +
+                                       string_part.value +
+                                       "' could not be interpreted as string.");
+      return false;
+    }
+
+    /**
+     * Add the interpreted part to the final_string.
+     */
+    final_string += string_representation;
+  }
+
+  /**
+   * If we reached this point, everything went as expected.
+   */
+  result = final_string;
   return true;
 }
 
@@ -1432,25 +1484,55 @@ bool Interpreter::string_value_for_parameter(
   }
 }
 
-bool Interpreter::print_interpretation_result(const std::any &result) {
+bool Interpreter::string_representation_of_interpretation_result(
+    const std::any &result, std::string &str) {
 
   /**
    * Check whether it is a double.
    */
   try {
-    std::cout << std::any_cast<double>(result);
+    str = std::to_string(std::any_cast<double>(result));
     return true;
-  } catch (const std::bad_any_cast& e) {} // Don't do anything when
-                                          // the cast failed.
+  } catch (const std::bad_any_cast &e) {
+  }
+
+  /**
+   * Check whether it is a string.
+   */
+  try {
+    str = std::any_cast<std::string>(result);
+    return true;
+  } catch (const std::bad_any_cast &e) {
+  }
 
   /**
    * Check whether is a Pol object.
    */
   try {
-    std::cout << std::any_cast<Pol>(result);
+    str = std::any_cast<Pol>(result).to_string();
     return true;
-  } catch ( const std::bad_any_cast &bac) {}
+  } catch (const std::bad_any_cast &bac) {
+  }
 
+  /**
+   * If we didn't find a string representation, we return false.
+   */
+  return false;
+}
+
+bool Interpreter::print_interpretation_result(const std::any &result) {
+
+  std::string string_representation;
+  if (Interpreter::string_representation_of_interpretation_result(
+          result, string_representation)) {
+    std::cout << string_representation;
+    return true;
+  }
+
+  /**
+   * If we didn't get a string representation, we couldn't print the
+   * result.
+   */
   return false;
 }
 
