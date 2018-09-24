@@ -17,6 +17,7 @@
  */
 #include <lexer.hpp>
 #include <interpreter.hpp>
+#include <io_helper.hpp>
 #include <system.hpp>
 #include <state.hpp>
 
@@ -57,23 +58,20 @@ int main(int argc, char *argv[]) {
   hydra::Lexer lexer(system);
   hydra::Interpreter interpreter(system);
 
-  // std::string command =
-  //     "var o = Pol(r: 0.0, phi: random(from: 0.0 + 1.0, to: (0.5 * M_PI)))";
+  /**
+   * Read the code from the passed file.
+   */
+  std::vector<std::string> code;
 
-  std::vector<std::string> code = {
-      // "for i in [0.0, 1.0, 3.0] {",
-      // "\tfor j in [1.0, 1.0, i * i] {",
-      // "\t\tprint(message: \"-\")",
-      // "\t}",
-      // "\tprint(message: \"> \")",
-      // "\tprint(message: \"Bow to the mighty Hydra!\n\")",
-      // "}",
-      // "print(message: \"Done!\n\")"
-                                   "var a = 5.0",
-                                   "print(message: \"Five is \\(a) and Two times Five is \\(2.0 * a)\")",
-                                   "print(message: \"Fiveteen is \\(1.0)\\(a)\")",
-                                   "print(message: \"\\(M_PI) tastes great!\")"
-  };
+  /**
+   * Check whether a file name was passed as argument.
+   */
+  if (argc > 1) {
+    std::string file_name(argv[1]);
+
+    DLOG(INFO) << "Reading code from file: '" << file_name << "'..." << std::endl;
+    hydra::IOHelper::read_code_from_file(file_name, code);
+  }
 
   std::cout << "Interpreting code: " << std::endl << std::endl;
   for (int line = 0; line < (int)code.size(); ++line) {

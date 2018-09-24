@@ -6,8 +6,6 @@
 //
 
 #include <interpreter.hpp>
-#include <lexer.hpp>
-#include <canvas.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -19,10 +17,12 @@ namespace hydra {
 Interpreter::Interpreter(System &system) : system(system) {
 
   this->builtin_functions = {
+      {"circle", &Interpreter::function_circle},
       {"cos", &Interpreter::function_cos},
       {"cosh", &Interpreter::function_cosh},
       {"exp", &Interpreter::function_exp},
       {"print", &Interpreter::function_print},
+      {"save", &Interpreter::function_save},
       {"sin", &Interpreter::function_sin},
       {"sinh", &Interpreter::function_sinh},
       {"random", &Interpreter::function_random}
@@ -109,6 +109,10 @@ bool Interpreter::interpret_parse_result(const ParseResult &input,
         std::string("Cannot interpret statemet of type '") +
         System::name_for_type.at(input.type) + "'.");
     return false;
+  }
+
+  if (input.type == Empty) {
+    return true;
   }
 
   /**
@@ -1453,6 +1457,43 @@ bool Interpreter::number_value_for_parameter(
   }
 
   return true;
+}
+
+bool Interpreter::pol_value_for_parameter(
+    const std::string &parameter,
+    const std::unordered_map<std::string, std::any> &interpreted_arguments,
+    Pol &value) {
+
+  /**
+   * Check whether the argument was is in the list.
+   */
+  std::any argument_value;
+  if (!argument_value_for_parameter(parameter, interpreted_arguments,
+                                    argument_value)) {
+    this->system.print_error_message(
+        std::string(
+            "Could not interpret function / initialization. Argument for "
+            "parameter '") +
+        parameter + "' could not be found.");
+    return false;
+  }
+
+  /**
+   * Check whether the value can be cast to Pol.
+   */
+  try {
+    value = std::any_cast<Pol>(argument_value);
+    return true;
+  } catch (std::bad_any_cast &bac) {
+    this->system.print_error_message(
+        std::string(
+            "Could not interpret function / initialization. Argument for "
+            "parameter '") +
+        parameter + "' could not be interpreted as Pol.");
+    return false;
+  }
+
+  return false;
 }
 
 bool Interpreter::string_value_for_parameter(

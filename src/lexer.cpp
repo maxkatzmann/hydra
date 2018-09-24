@@ -738,6 +738,11 @@ bool Lexer::parse_tokens(const std::vector<Token> &tokens,
    */
   Type type = type_of_tokenized_string(tokens);
 
+  if (type == Empty) {
+    result.type = Empty;
+    return true;
+  }
+
   /**
    * Find the parser that should be used for a tokenized string of
    * that type.

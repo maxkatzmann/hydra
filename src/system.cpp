@@ -47,8 +47,8 @@ System::System() {
                               {"for", Loop},
                               {"in", Range},
                               {"line", Function},
+                              {"mark", Function},
                               {"Pol", Initialization},
-                              {"point", Function},
                               {"print", Function},
                               {"random", Function},
                               {"save", Function},
@@ -78,11 +78,11 @@ System::System() {
                            {"Euc", Func("Euc", {"x", "y"})},
                            {"exp", Func("exp", {"x"})},
                            {"line", Func("line", {"from", "to"})},
-                           {"point", Func("point", {"center", "radius"})},
+                           {"mark", Func("mark", {"center", "radius"})},
                            {"Pol", Func("Pol", {"r", "phi"})},
                            {"print", Func("print", {"message"})},
                            {"random", Func("random", {"from", "to"})},
-                           {"save", Func("save", {})},
+                           {"save", Func("save", {"file"})},
                            {"sin", Func("sin", {"x"})},
                            {"sinh", Func("sinh", {"x"})},
                            {"show", Func("show", {})},
@@ -99,6 +99,8 @@ void System::print_error_message(const std::string &message) {
       std::cerr << "Error in line " << this->state.line_number << ": "
                 << message << std::endl;
     }
+  } else {
+    std::cerr << "> " << message << std::endl;
   }
 }
 

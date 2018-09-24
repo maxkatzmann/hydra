@@ -22,6 +22,7 @@
 
 #include <glog/logging.h>
 
+#include <canvas.hpp>
 #include <lexer.hpp>
 
 namespace hydra {
@@ -39,6 +40,11 @@ namespace hydra {
      * evaluate variables, etc.
      */
     System &system;
+
+    /**
+     * The canvas holds all geometric objects.
+     */
+    Canvas canvas;
 
     /**
      * Maps a Type (e.g. Assignment) to the function that is
@@ -185,6 +191,17 @@ namespace hydra {
 
     /**
      * Given an interpreted argument list, tries to determine the
+     * Pol value for the passed parameter name.  Returns false,
+     * if the value could not be obtained.  If successful, returns true and
+     * passes the result to value.
+     */
+    bool pol_value_for_parameter(
+        const std::string &parameter,
+        const std::unordered_map<std::string, std::any> &interpreted_arguments,
+        Pol &value);
+
+    /**
+     * Given an interpreted argument list, tries to determine the
      * numerical value for the passed parameter name.  Returns false,
      * if the value could not be obtained.  If successful, returns true and
      * passes the result to value.
@@ -198,11 +215,13 @@ namespace hydra {
      * The implementation of these functions can be found in
      * interpreter_functions.cpp
      */
+    bool function_circle(const ParseResult &function_call, std::any &result);
     bool function_cos(const ParseResult &function_call, std::any &result);
     bool function_cosh(const ParseResult &function_call, std::any &result);
     bool function_exp(const ParseResult &function_call, std::any &result);
     bool function_print(const ParseResult &function_call, std::any &result);
     bool function_random(const ParseResult &function_call, std::any &result);
+    bool function_save(const ParseResult &function_call, std::any &result);
     bool function_sin(const ParseResult &function_call, std::any &result);
     bool function_sinh(const ParseResult &function_call, std::any &result);
 

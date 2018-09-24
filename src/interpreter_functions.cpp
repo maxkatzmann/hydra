@@ -15,6 +15,44 @@
 
 namespace hydra {
 
+bool Interpreter::function_circle(const ParseResult &function_call,
+                                  std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  Pol center;
+  if (!pol_value_for_parameter("center", interpreted_arguments, center)) {
+    return false;
+  }
+
+  double radius;
+
+  if (!number_value_for_parameter("radius", interpreted_arguments, radius)) {
+    return false;
+  }
+
+  /**
+   * Add the circle to the canvas.
+   */
+  Path circle_path;
+  Canvas::path_for_circle(center, radius, this->canvas.resolution, circle_path);
+  this->canvas.add_path(circle_path);
+
+  return true;
+}
+
 bool Interpreter::function_cos(const ParseResult &function_call,
                                 std::any &result) {
   DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
@@ -30,7 +68,7 @@ bool Interpreter::function_cos(const ParseResult &function_call,
   interpret_arguments_from_function_call(function_call, interpreted_arguments);
 
   /**
-   * Now we try to get the obtain the actual argument value.
+   * Now we try to obtain the actual argument value.
    */
   double x;
 
@@ -60,7 +98,7 @@ bool Interpreter::function_cosh(const ParseResult &function_call,
   interpret_arguments_from_function_call(function_call, interpreted_arguments);
 
   /**
-   * Now we try to get the obtain the actual argument value.
+   * Now we try to obtain the actual argument value.
    */
   double x;
 
@@ -90,7 +128,7 @@ bool Interpreter::function_exp(const ParseResult &function_call,
   interpret_arguments_from_function_call(function_call, interpreted_arguments);
 
   /**
-   * Now we try to get the obtain the actual argument value.
+   * Now we try to obtain the actual argument value.
    */
   double x;
 
@@ -120,7 +158,7 @@ bool Interpreter::function_print(const ParseResult &function_call,
   interpret_arguments_from_function_call(function_call, interpreted_arguments);
 
   /**
-   * Now we try to get the obtain the actual argument value.
+   * Now we try to obtain the actual argument value.
    */
   std::string message;
 
@@ -155,7 +193,7 @@ bool Interpreter::function_random(const ParseResult &function_call,
   interpret_arguments_from_function_call(function_call, interpreted_arguments);
 
   /**
-   * Now we try to get the obtain the actual argument values.
+   * Now we try to obtain the actual argument values.
    */
   double from;
   double to;
@@ -192,6 +230,36 @@ bool Interpreter::function_random(const ParseResult &function_call,
   return true;
 }
 
+bool Interpreter::function_save(const ParseResult &function_call,
+                                std::any &result) {
+
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  std::string file_name;
+  if (!string_value_for_parameter("file", interpreted_arguments, file_name)) {
+    return false;
+  }
+
+  /**
+   * Tell the canvas to save its contents to the passed file.
+   */
+  this->canvas.save_to_file(file_name);
+  return true;
+}
+
 bool Interpreter::function_sin(const ParseResult &function_call,
                                std::any &result) {
   DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
@@ -207,7 +275,7 @@ bool Interpreter::function_sin(const ParseResult &function_call,
   interpret_arguments_from_function_call(function_call, interpreted_arguments);
 
   /**
-   * Now we try to get the obtain the actual argument value.
+   * Now we try to obtain the actual argument value.
    */
   double x;
 
@@ -237,7 +305,7 @@ bool Interpreter::function_sinh(const ParseResult &function_call,
   interpret_arguments_from_function_call(function_call, interpreted_arguments);
 
   /**
-   * Now we try to get the obtain the actual argument value.
+   * Now we try to obtain the actual argument value.
    */
   double x;
 
