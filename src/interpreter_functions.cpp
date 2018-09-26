@@ -177,6 +177,36 @@ bool Interpreter::function_print(const ParseResult &function_call,
   return true;
 }
 
+bool Interpreter::function_log(const ParseResult &function_call,
+                               std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  double x;
+
+  if (!number_value_for_parameter("x", interpreted_arguments, x)) {
+    return false;
+  }
+
+  /**
+   * Compute the result.
+   */
+  result = ::log(x);
+  return true;
+}
+
 bool Interpreter::function_random(const ParseResult &function_call,
                                   std::any &result) {
 

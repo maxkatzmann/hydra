@@ -21,6 +21,7 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"cos", &Interpreter::function_cos},
       {"cosh", &Interpreter::function_cosh},
       {"exp", &Interpreter::function_exp},
+      {"log", &Interpreter::function_log},
       {"print", &Interpreter::function_print},
       {"save", &Interpreter::function_save},
       {"sin", &Interpreter::function_sin},

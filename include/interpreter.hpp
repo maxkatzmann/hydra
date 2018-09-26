@@ -219,6 +219,7 @@ namespace hydra {
     bool function_cos(const ParseResult &function_call, std::any &result);
     bool function_cosh(const ParseResult &function_call, std::any &result);
     bool function_exp(const ParseResult &function_call, std::any &result);
+    bool function_log(const ParseResult &function_call, std::any &result);
     bool function_print(const ParseResult &function_call, std::any &result);
     bool function_random(const ParseResult &function_call, std::any &result);
     bool function_save(const ParseResult &function_call, std::any &result);

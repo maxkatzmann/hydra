@@ -311,11 +311,7 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
        * our string at 0, we have -1 here.
        */
       int position_of_last_escape_end = -1;
-      int position_of_escape = string_content.find_first_of("\(");
-
-      DLOG(INFO) << "Found escape at position: " << position_of_escape
-                 << std::endl;
-
+      int position_of_escape = string_content.find_first_of("\\");
 
       /**
        * As long as we find an escape, we identify the part within the
@@ -324,12 +320,43 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
       while (position_of_escape != (int)std::string::npos) {
 
         /**
+         * If we're already to far at the end, we can stop looking for
+         * escape sequences.
+         */
+        if (position_of_escape >= (int)string_content.length() - 1) {
+          break;
+        }
+
+        /**
+         * If the character after the \ is not a ( we have not really
+         * found the escape sequence.
+         */
+        if (string_content[position_of_escape + 1] != '(') {
+
+          /**
+           * We did not really found an escape marker, so we continue
+           * searching for the next possible position.
+           */
+          position_of_escape =
+              string_content.find_first_of("\\", position_of_escape + 1);
+          continue;
+        }
+
+        /**
+         * We found the \( escape marker but the current
+         * position_of_escape is on \. So we add 1.
+         */
+        ++position_of_escape;
+
+        DLOG(INFO) << "Found escape at position: " << position_of_escape
+                   << std::endl;
+        /**
          * If we found an escape character, we add the part of the
          * string before the escape as a child of the string token.
          */
         std::string previous_string_part = string_content.substr(
             position_of_last_escape_end + 1,
-            position_of_escape - (position_of_last_escape_end + 2));
+            position_of_escape - 1 - (position_of_last_escape_end + 1));
 
         /**
          * Add the previous part of the token if its not empty.
@@ -344,7 +371,7 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
          */
         int position_of_matching_bracket =
             position_of_matching_bracket_for_position(string_content, '(',
-                                                      position_of_escape + 1);
+                                                      position_of_escape);
 
         DLOG(INFO) << "Position of escape closing bracket: "
                    << position_of_matching_bracket << std::endl;
@@ -389,7 +416,7 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
          * If we're at the end of the string we can just stop looking
          * for escape markers now.
          */
-        if (position_of_matching_bracket >= (int)string_content.length()) {
+        if (position_of_matching_bracket >= (int)string_content.length() - 1) {
           break;
         }
 
@@ -403,7 +430,7 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
          * the next escape marker.
          */
         position_of_escape = string_content.find_first_of(
-            "\(", position_of_matching_bracket + 1);
+            "\\", position_of_matching_bracket + 1);
 
         /**
          * If we don't have another escape part, we simply add the

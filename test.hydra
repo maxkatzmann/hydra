@@ -1,5 +1,5 @@
 print(message: "Bow to the mighty Hydra!\n")
 
-for i in [0, 1, 9] {
-    print(message: "Loop iteration: \(i)\n")
+for i in [0, 0.1, 5.0] {
+    print(message: "log(\(i)) = \(log(x: i))\n")
 }
