@@ -1,5 +1,9 @@
 print(message: "Bow to the mighty Hydra!\n")
 
-for i in [0, 0.1, 5.0] {
-    print(message: "log(\(i)) = \(log(x: i))\n")
-}
+var p1 = Pol(r: 5.0, phi: M_PI / 8.0)
+var p2 = Pol(r: 2.5, phi: M_PI / 2.0)
+
+line(from: p1, to: p2)
+
+save(file: "line.ipe")
+print(message: "Done!\n")

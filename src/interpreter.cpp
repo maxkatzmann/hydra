@@ -22,6 +22,7 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"cosh", &Interpreter::function_cosh},
       {"exp", &Interpreter::function_exp},
       {"log", &Interpreter::function_log},
+      {"line", &Interpreter::function_line},
       {"print", &Interpreter::function_print},
       {"save", &Interpreter::function_save},
       {"sin", &Interpreter::function_sin},
@@ -1209,7 +1210,7 @@ bool Interpreter::interpret_expression(const ParseResult &input,
 
 bool Interpreter::interpret_variable(const ParseResult &input,
                                      std::any &result) {
-  DLOG(INFO) << "Interpreting number with value: '" << input.value
+  DLOG(INFO) << "Interpreting variable with value: '" << input.value
              << "'." << std::endl;
 
   /**

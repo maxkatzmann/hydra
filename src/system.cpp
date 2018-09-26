@@ -108,11 +108,7 @@ void System::print_error_message(const std::string &message) {
 
 void System::print_argument_list(const std::vector<std::string> &arguments) {
   for (int i = 0; i < (int)arguments.size(); ++i) {
-    std::cerr << arguments[i];
-
-    if (i < (int)arguments.size() - 1) {
-      std::cerr << ":";
-    }
+    std::cerr << arguments[i] << ":";
   }
 }
 } // namespace hydra

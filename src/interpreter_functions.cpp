@@ -8,6 +8,7 @@
 //
 
 #include <interpreter.hpp>
+#include <pol.hpp>
 
 #include <cmath>
 #include <iostream>
@@ -204,6 +205,43 @@ bool Interpreter::function_log(const ParseResult &function_call,
    * Compute the result.
    */
   result = ::log(x);
+  return true;
+}
+
+bool Interpreter::function_line(const ParseResult &function_call,
+                                std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  Pol from;
+  if (!pol_value_for_parameter("from", interpreted_arguments, from)) {
+    return false;
+  }
+
+  Pol to;
+  if (!pol_value_for_parameter("to", interpreted_arguments, to)) {
+    return false;
+  }
+
+  /**
+   * Add the line to the canvas.
+   */
+  Path line_path;
+  Canvas::path_for_line(from, to, this->canvas.resolution, line_path);
+  this->canvas.add_path(line_path);
+
   return true;
 }
 

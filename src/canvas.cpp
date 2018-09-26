@@ -8,10 +8,14 @@
 #include <canvas.hpp>
 
 #include <fstream>
+#include <glog/logging.h>
 
 namespace hydra {
 
-void Canvas::add_path(const Path &path) { this->paths.push_back(path); }
+void Canvas::add_path(const Path &path) {
+  DLOG(INFO) << "Adding path." << std::endl;
+  this->paths.push_back(path);
+}
 
 void Canvas::add_mark(const Circle &mark) { this->marks.push_back(mark); }
 
@@ -21,6 +25,8 @@ void Canvas::clear() {
 }
 
 void Canvas::save_to_file(const std::string &file_name) const {
+  DLOG(INFO) << "Writing canvas to file: '" << file_name << "'." << std::endl;
+
   /**
    * The stream that is used to write to the file.
    */
@@ -48,11 +54,48 @@ void Canvas::ipe_canvas_representation(std::string &ipe_representation) const {
       "<view layers=\"alpha\" active=\"alpha\"/>\n";
 
   /**
+   * In order to obtain a nice drawing, we now determine the
+   * coordinate with the largest radius. When we know that, we
+   * translate everything such that all points are in the drawing
+   * canvas. (E.g. in Ipe the point 0,0 is in the bottom left and
+   * everything with negative x/y coordinates is out of the canvas.)
+   */
+  double maximum_radius = 0.0;
+
+  /**
+   * Find the maximum radius among the marks.
+   */
+  for (const Circle &mark : this->marks) {
+    if (mark.center.r > maximum_radius) {
+      maximum_radius = mark.center.r;
+    }
+  }
+
+  /**
+   * Find the maximum radius among the paths.
+   */
+  for (const Path &path : this->paths) {
+    for (const Pol point : path.points) {
+      if (point.r > maximum_radius) {
+        maximum_radius = point.r;
+      }
+    }
+  }
+
+  /**
+   * The offset that shifts everything.
+   */
+  Euc offset(this->scale * maximum_radius,
+             this->scale * maximum_radius);
+
+  /**
    * Print Marks.
    */
   for (const Circle &mark : this->marks) {
     std::string circle_representation;
-    Canvas::ipe_circle_representation(mark, circle_representation);
+    Canvas::ipe_circle_representation(mark, circle_representation, this->scale,
+                                      offset);
+    ipe_representation += circle_representation;
   }
 
   /**
@@ -60,7 +103,8 @@ void Canvas::ipe_canvas_representation(std::string &ipe_representation) const {
    */
   for (const Path &path : this->paths) {
     std::string path_representation;
-    Canvas::ipe_path_representation(path, path_representation);
+    Canvas::ipe_path_representation(path, path_representation, this->scale, offset);
+    ipe_representation += path_representation;
   }
 
   /**
@@ -75,7 +119,8 @@ void Canvas::ipe_canvas_representation(std::string &ipe_representation) const {
  * Creates a string that represents the passed path.
  */
 void Canvas::ipe_path_representation(const Path &path,
-                                     std::string &ipe_path_representation) {
+                                     std::string &ipe_path_representation,
+                                     double scale, Euc offset) {
   /**
    * Only determine the representation if the path is not empty.
    */
@@ -86,7 +131,9 @@ void Canvas::ipe_path_representation(const Path &path,
     /**
      * Print the first point of the path.
      */
-    Euc point = path.points[0].to_euc();
+    Euc point(path.points[0], scale);
+    point.x += offset.x;
+    point.y += offset.y;
     ipe_path_representation +=
         std::to_string(point.x) + " " + std::to_string(point.y) + " m\n";
 
@@ -94,21 +141,27 @@ void Canvas::ipe_path_representation(const Path &path,
      * Print the remaining points.
      */
     for (int index = 1; index < path.size(); ++index) {
-      point = path.points[index].to_euc();
+      point = Euc(path.points[index], scale);
+      point.x += offset.x;
+      point.y += offset.y;
       ipe_path_representation +=
           std::to_string(point.x) + " " + std::to_string(point.y) + " l\n";
     }
 
     if (path.is_closed) {
       ipe_path_representation += "h\n";
-      ipe_path_representation += "</path>\n";
     }
+
+    ipe_path_representation += "</path>\n";
   }
 }
 
 void Canvas::ipe_circle_representation(const Circle &circle,
-                                     std::string &ipe_circle_representation) {
-  Euc center = circle.center.to_euc();
+                                       std::string &ipe_circle_representation,
+                                       double scale, Euc offset) {
+  Euc center(circle.center, scale);
+  center.x += offset.x;
+  center.y += offset.y;
 
   ipe_circle_representation =
     std::string("<path stroke=\"") + "black" + "\"";
@@ -254,6 +307,74 @@ void Canvas::path_for_circle(const Pol &center, double radius, double resolution
    */
   for (Pol &p : path.points) {
     p.rotate_by(center.phi);
+  }
+}
+
+void Canvas::path_for_line(const Pol &from, const Pol &to, double resolution,
+                           Path &path) {
+  /**
+   * A line is not closed.
+   */
+  path.is_closed = false;
+
+  /**
+   * We first translate / rotate both points, such that one of the
+   * lies in the origin. Then we samples resolution many points on the
+   * radius from the origin to the second point. Afterwards we perform
+   * the inverse translation / rotation (inverse to the first
+   * operation) to all points.
+   *
+   * All we need for these translations / rotations are the coordinate
+   * of the first point. (We copy both points, since we must not
+   * manipulate the input coordinates.)
+   */
+  Pol p1(from);
+  Pol p2(to);
+  double from_radius = from.r;
+  double from_phi = from.phi;
+
+  /**
+   * Rotate 'both' points by -from_phi (such that p1 lies on the
+   * x-axis). We don't need to actually perform the operation on p1
+   * itself. In the end we only care for the position of p2.
+   */
+  p2.rotate_by(-from_phi);
+
+  /**
+   * Translate 'both' points (such that p1 lies on the origin). Since
+   * p1 will then be on the origin we don't need to actually perform
+   * the operation on p1.
+   */
+  p2.translate_horizontally_by(-from_radius);
+
+  /**
+   * Now p1 is on the origin and all points on the line from p1 to p2
+   * have the same angular coordinate as p2 currently has.
+   */
+  path.push_back(Pol(0.0, 0.0)); // p1
+
+  /**
+   * Add the points
+   */
+  double step_size = p2.r / resolution;
+  double r = step_size;
+
+  while (r < p2.r) {
+    path.push_back(Pol(r, p2.phi));
+    r += step_size;
+  }
+
+  /**
+   * Add p2.
+   */
+  path.push_back(p2);
+
+  /**
+   * Rotate all points by applying the inverse operations.
+   */
+  for (int i = 0; i < (int)path.points.size(); ++i) {
+    path.points[i].translate_horizontally_by(from_radius);
+    path.points[i].rotate_by(from_phi);
   }
 }
 

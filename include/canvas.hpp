@@ -19,80 +19,43 @@
 #include <string>
 #include <vector>
 
+#include <pol.hpp>
+
 namespace hydra {
 
   /**
    * Representation of a Euclidean coordinate. E.g. the ones used when
    * drawing the canvas.
    */
-  struct Euc {
+struct Euc {
 
-    Euc(double x, double y) {
-      this->x = x;
-      this->y = y;
-    }
+  double x = 0.0;
+  double y = 0.0;
 
-    double x = 0.0;
-    double y = 0.0;
+  Euc(double x, double y) {
+    this->x = x;
+    this->y = y;
+  }
 
-    friend std::ostream &operator<<(std::ostream &os, const Euc &p) {
-      return os << p.to_string();
-    }
+  Euc(const Pol &p) {
+    this->x = p.r * cos(p.phi);
+    this->y = p.r * sin(p.phi);
+  }
 
-    std::string to_string() const {
-      return std::string("Euc(") + std::to_string(this->x) + ", " +
-        std::to_string(this->y) + ")";
-    }
-  };
+  Euc(const Pol &p, double scale) {
+    this->x = scale * p.r * cos(p.phi);
+    this->y = scale * p.r * sin(p.phi);
+  }
 
-  /**
-   * Represents a point in the hyperbolic plane using native
-   * coordinates.
-   */
-  struct Pol {
+  friend std::ostream &operator<<(std::ostream &os, const Euc &p) {
+    return os << p.to_string();
+  }
 
-    Pol() {}
-
-    Pol(double r, double phi) {
-      this->r = r;
-      this->phi = phi;
-    }
-
-    double r = 0.0;
-    double phi = 0.0;
-
-    friend std::ostream &operator<<(std::ostream &os, const Pol &p) {
-      return os << p.to_string();
-    }
-
-    std::string to_string() const {
-      return std::string("Pol(") + std::to_string(this->r) + ", " +
-        std::to_string(this->phi) + ")";
-    }
-
-    /**
-     * Converts a polar coordinate to a Euclidean coordinate.
-     */
-    Euc to_euc() const {
-      return Euc(this->r * cos(this->phi), this->r * sin(this->phi));
-    }
-
-    void rotate_by(const double angle) {
-      this->phi = std::fmod(phi + angle, 2.0 * M_PI);
-
-      while (this->phi < 0.0) {
-        this->phi += 2.0 * M_PI;
-      }
-    }
-
-    static double theta(double r_1, double r_2, double R) {
-      try {
-        return acos((cosh(r_1) * cosh(r_2) - cosh(R)) / (sinh(r_1) * sinh(r_2)));
-      } catch (std::domain_error &de) {}
-
-      return -1.0;
-    }
-  };
+  std::string to_string() const {
+    return std::string("Euc(") + std::to_string(this->x) + ", " +
+           std::to_string(this->y) + ")";
+  }
+};
 
   /**
    * A path object consists of multiple points and can either be
@@ -155,6 +118,13 @@ namespace hydra {
     double resolution = 100.0;
 
     /**
+     * Since we don't want a hyperbolic length of 1.0 to be
+     * represented by 1 pixel, we add a scale. Not sure whether the
+     * scale directly translates to the number of pixels though.
+     */
+    double scale = 15.0;
+
+    /**
      * Convenience method to add a path to the canvas.
      */
     void add_path(const Path &path);
@@ -181,16 +151,20 @@ namespace hydra {
     void ipe_canvas_representation(std::string &ipe_representation) const;
 
     /**
-     * Creates a string that represents the passed path.
+     * Creates a string that represents the passed path, by applying
+     * the scale to each point and moving them by the passed offset.
      */
     static void ipe_path_representation(const Path &path,
-                                        std::string &ipe_path_representation);
+                                        std::string &ipe_path_representation,
+                                        double scale = 1.0,
+                                        Euc offset = Euc(0.0, 0.0));
 
     /**
      * Creates a string that represents the passed mark.
      */
     static void ipe_circle_representation(
-        const Circle &circle, std::string &ipe_circle_representation);
+        const Circle &circle, std::string &ipe_circle_representation,
+        double scale = 1.0, Euc offset = Euc(0.0, 0.0));
 
     // "Rendering":
 
@@ -202,6 +176,9 @@ namespace hydra {
      */
     static void path_for_circle(const Pol &center, double radius,
                                 double resolution, Path &path);
+
+    static void path_for_line(const Pol &from, const Pol &to, double resolution,
+                              Path &path);
   };
   }  // namespace hydra
 
