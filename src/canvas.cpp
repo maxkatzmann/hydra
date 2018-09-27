@@ -144,6 +144,7 @@ void Canvas::ipe_path_representation(const Path &path,
       point = Euc(path.points[index], scale);
       point.x += offset.x;
       point.y += offset.y;
+
       ipe_path_representation +=
           std::to_string(point.x) + " " + std::to_string(point.y) + " l\n";
     }
@@ -335,7 +336,7 @@ void Canvas::path_for_line(const Pol &from, const Pol &to, double resolution,
 
   /**
    * Rotate 'both' points by -from_phi (such that p1 lies on the
-   * x-axis). We don't need to actually perform the operation on p1
+   * x-axis). We don't need to actually perform the transformation on p1
    * itself. In the end we only care for the position of p2.
    */
   p2.rotate_by(-from_phi);
@@ -343,7 +344,7 @@ void Canvas::path_for_line(const Pol &from, const Pol &to, double resolution,
   /**
    * Translate 'both' points (such that p1 lies on the origin). Since
    * p1 will then be on the origin we don't need to actually perform
-   * the operation on p1.
+   * the transformation on p1.
    */
   p2.translate_horizontally_by(-from_radius);
 
@@ -351,7 +352,7 @@ void Canvas::path_for_line(const Pol &from, const Pol &to, double resolution,
    * Now p1 is on the origin and all points on the line from p1 to p2
    * have the same angular coordinate as p2 currently has.
    */
-  path.push_back(Pol(0.0, 0.0)); // p1
+  path.push_back(from); // The first point on the path.
 
   /**
    * Add the points
@@ -360,22 +361,28 @@ void Canvas::path_for_line(const Pol &from, const Pol &to, double resolution,
   double r = step_size;
 
   while (r < p2.r) {
-    path.push_back(Pol(r, p2.phi));
+    /**
+     * Create the point.
+     */
+    Pol point(r, p2.phi);
+
+    /**
+     * Apply the inverse transformation.
+     */
+    point.translate_horizontally_by(from_radius);
+    point.rotate_by(from_phi);
+
+    /**
+     * Add the point and continue with the next one.
+     */
+    path.push_back(point);
     r += step_size;
   }
 
   /**
-   * Add p2.
+   * The last point on the path.
    */
-  path.push_back(p2);
-
-  /**
-   * Rotate all points by applying the inverse operations.
-   */
-  for (int i = 0; i < (int)path.points.size(); ++i) {
-    path.points[i].translate_horizontally_by(from_radius);
-    path.points[i].rotate_by(from_phi);
-  }
+  path.push_back(to);
 }
 
 }  // namespace hydra

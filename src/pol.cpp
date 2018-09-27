@@ -78,10 +78,15 @@ void Pol::translate_horizontally_by(const double distance) {
 
     try {
       angular_coordinate = acos(enumerator / denominator);
-      if (distance < 0.0) {
-        angular_coordinate = M_PI - angular_coordinate;
-      }
     } catch (std::domain_error &de) {
+    }
+
+    if (isnan(angular_coordinate)) {
+      angular_coordinate = 0.0;
+    }
+
+    if (distance < 0.0) {
+      angular_coordinate = M_PI - angular_coordinate;
     }
 
     /**
@@ -97,6 +102,7 @@ void Pol::translate_horizontally_by(const double distance) {
     if (original_point.phi > M_PI) {
       this->phi = 2.0 * M_PI - this->phi;
     }
+
   } else {
     /**
      * The coordinate does lie on the x-axis so the translation only
