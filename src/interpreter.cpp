@@ -17,6 +17,7 @@ namespace hydra {
 Interpreter::Interpreter(System &system) : system(system) {
 
   this->builtin_functions = {
+      {"clear", &Interpreter::function_clear},
       {"circle", &Interpreter::function_circle},
       {"cos", &Interpreter::function_cos},
       {"cosh", &Interpreter::function_cosh},

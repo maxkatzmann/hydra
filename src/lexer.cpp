@@ -1633,13 +1633,28 @@ bool Lexer::parse_argument_list(
   int number_of_found_arguments = 0;
 
   /**
-   * If the argument list is empty, something went wrong.
+   * If the argument list is empty but we actually expect arguments,
+   * something went wrong. If the argument list is empty and we don't
+   * expect arguments, we don't have to do anything.
    */
   if (tokens.empty()) {
-    result.type = Error;
-    this->system.print_error_message(
-        std::string("Missing argument in function call."));
-    return false;
+
+    /**
+     * We have no tokens. If we expected some, there is an error.
+     */
+    if (!expected_arguments.empty()) {
+      result.type = Error;
+      this->system.print_error_message(
+          std::string("Missing argument in function call."));
+      return false;
+    } else {
+
+      /**
+       * If we don't have arguments but also didn't expect any, we
+       * don't have to do anything.
+       */
+      return true;
+    }
   }
 
   /**

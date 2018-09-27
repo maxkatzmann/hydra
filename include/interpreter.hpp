@@ -216,6 +216,7 @@ namespace hydra {
      * interpreter_functions.cpp
      */
     bool function_circle(const ParseResult &function_call, std::any &result);
+    bool function_clear(const ParseResult &function_call, std::any &result);
     bool function_cos(const ParseResult &function_call, std::any &result);
     bool function_cosh(const ParseResult &function_call, std::any &result);
     bool function_exp(const ParseResult &function_call, std::any &result);

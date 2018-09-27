@@ -3,11 +3,9 @@ print(message: "Bow to the mighty Hydra!\n")
 var p = Pol(r: 0.0, phi: 0.0)
 var p2 = Pol(r: 0.0, phi: 0.0)
 
-for i in [0.0, 1.0, 100.0] {
-    line(from: p, to: p2)
-    p = p2
-    p2 = Pol(r: random(from: 0.0, to: 10.0), phi: random(from: 0.0, to: 2.0 * M_PI))
-}
+line(from: p, to: p2)
+
+clear()
 
 save(file: "my_lines.ipe")
 print(message: "Done!\n")

@@ -16,6 +16,39 @@
 
 namespace hydra {
 
+bool Interpreter::function_clear(const ParseResult &function_call,
+                                 std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+
+  /**
+   * If there are arguments, something went wrong. Clear is not
+   * supposed to have arguments.
+   */
+  if (!interpreted_arguments.empty()) {
+    this->system.print_error_message(
+        std::string("Extraneous argument in call to function '") +
+        function_call.value + "'. This function does not take any arguments.");
+    return false;
+  }
+
+  /**
+   * Actually clear the canvas.
+   */
+  this->canvas.clear();
+
+  return true;
+}
+
 bool Interpreter::function_circle(const ParseResult &function_call,
                                   std::any &result) {
   DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
