@@ -507,7 +507,62 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
           current_index, position_of_next_separator - current_index);
     }
 
+    /**
+     * Create the token.
+     */
     Token token(current_token, type_of_string(current_token));
+
+
+    /**
+     * Check whether the current token represents a property
+     * access. For this to be the case, the type of the token must not
+     * be number and the token hast to contain a '.'
+     *
+     * Check whether the current token contains '.' which indicates,
+     * that this is a property access of a variable. We currently
+     * don't support concatenate property access.
+     */
+    if (token.type != Number) {
+      int position_of_dot = current_token.find_first_of(".");
+
+      if (position_of_dot != (int)std::string::npos) {
+
+        if (position_of_dot == 0 ||
+            position_of_dot == (int)current_token.size() - 1) {
+          this->system.print_error_message(
+              std::string("Could not parse '") + current_token +
+              "'. '.' are only allowed to define numbers or when accessing "
+              "properties.");
+          return false;
+        }
+
+        /**
+         * Determine the variable name and the property name.
+         */
+        std::string variable_name = current_token.substr(0, position_of_dot);
+        std::string property_name =
+            current_token.substr(position_of_dot + 1, std::string::npos);
+
+        DLOG(INFO) << "Property access. Variable: '"
+                   << variable_name + "', Property: '" << property_name << "'."
+                   << std::endl;
+
+        /**
+         * Check whether the property name contains a '.', which would
+         * be an error.
+         */
+        if (property_name.find_first_of(".") != std::string::npos) {
+          this->system.print_error_message(
+              std::string("Could not parse '") + current_token +
+              "'. Concatenated property access is not yet supported.");
+          return false;
+        }
+
+        token = Token(variable_name, Variable);
+        Token property_access_token(property_name, Property);
+        token.children.push_back(property_access_token);
+      }
+    }
 
     /**
      * Continue with the next token.
@@ -794,8 +849,28 @@ bool Lexer::parse_tokens(const std::vector<Token> &tokens,
     if (tokens.size() == 1) {
       DLOG(INFO) << "Unknown token: '" << tokens[0].value
                  << "'. Maybe it is a variable name..." << std::endl;
+
       result.type = Unknown;
       result.value = tokens[0].value;
+
+      /**
+       * If the single token has exactly one child that is a property
+       * we are sure that this should be a variable for which a
+       * property should be accessed.
+       */
+      if (tokens[0].children.size() == 1 &&
+          tokens[0].children[0].type == Property) {
+        result.type = Variable;
+
+        /**
+         * Create a token for the property name.
+         */
+        ParseResult property_access_parse_result(Property,
+                                                 tokens[0].children[0].value);
+
+        result.children.push_back(property_access_parse_result);
+      }
+
       return true;
     } else {
       result.type = Error;

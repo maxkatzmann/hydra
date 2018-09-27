@@ -1,10 +1,7 @@
 print(message: "Bow to the mighty Hydra!\n")
 
 var a = Pol(r: 2.0, phi: 3.0 * M_PI / 4.0)
-var b = Pol(r: 3.0, phi: M_PI / 4.0)
-
-line(from: a, to: b)
-circle(center: b, radius: 4.0)
-save(file: "my_lines.ipe")
+var b = a.r
+var c = a.r * a.phi
 
 print(message: "Done!\n")

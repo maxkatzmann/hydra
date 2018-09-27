@@ -36,11 +36,12 @@ enum Type {
   Number = 9,
   Operator = 10,
   Parenthesis = 11,
-  Range = 12,
-  String = 13,
-  StringEscape = 14,
-  Unknown = 15,
-  Variable = 16
+  Property = 12,
+  Range = 13,
+  String = 14,
+  StringEscape = 15,
+  Unknown = 16,
+  Variable = 17
 };
 
 /**

@@ -1279,6 +1279,37 @@ bool Interpreter::interpret_variable(const ParseResult &input,
     return false;
   }
 
+  /**
+   * Check whether we are actually trying to access a property of the
+   * current variable.
+   */
+  if (input.children.size() == 1 && input.children[0].type == Property) {
+
+    std::string property_name = input.children[0].value;
+
+    DLOG(INFO) << "Trying to access property '" << property_name
+               << "' of variable '" << input.value << "'." << std::endl;
+
+    /**
+     * Try to get the property value from the variable which is
+     * currently stored in the result.
+     */
+    try {
+      PropertyMap property_map = std::any_cast<PropertyMap>(result);
+
+      /**
+       * Try to get the value of the property.
+       */
+      return value_for_property(property_name, property_map, result);
+
+    } catch (std::bad_any_cast &bac) {
+      this->system.print_error_message(
+          std::string("Could not access property '") + property_name +
+          "' of variable '" + input.value + "'. Did not find property map.");
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -1618,6 +1649,28 @@ bool Interpreter::string_value_for_parameter(
   } catch (std::bad_any_cast &bac) {
     return false;
   }
+}
+
+bool Interpreter::value_for_property(const std::string &property_name,
+                                     const PropertyMap &property_map,
+                                     std::any &result) {
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  PropertyMap::const_iterator position_of_property =
+      property_map.find(property_name);
+
+  if (position_of_property == property_map.end()) {
+    this->system.print_error_message(std::string("Could not find property '") +
+                                     property_name + "'.");
+    return false;
+  }
+
+  result = position_of_property->second;
+  return true;
 }
 
 bool Interpreter::string_representation_of_interpretation_result(

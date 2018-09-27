@@ -212,6 +212,13 @@ namespace hydra {
         std::string &str);
 
     /**
+     * Determines the value of a property in the passed property
+     * map. Returns false if the property could not be found.
+     */
+    bool value_for_property(const std::string &property_name,
+                            const PropertyMap &property_map, std::any &result);
+
+    /**
      * The implementation of these functions can be found in
      * interpreter_functions.cpp
      */
