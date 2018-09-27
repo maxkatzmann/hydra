@@ -31,8 +31,8 @@ bool State::close_scope() {
   return true;
 }
 
-bool State::define_variable_with_value(const std::string &variable,
-                                       const std::any &value) {
+int State::define_variable_with_value(const std::string &variable,
+                                      const std::any &value) {
   /**
    * First check whether the variable is not yet defined.
    */
@@ -41,31 +41,41 @@ bool State::define_variable_with_value(const std::string &variable,
     /**
      * Variable is already defined.
      */
-    return false;
+    return -1;
   }
 
   /**
    * Check whether the value does actually have a value.
    */
   if (!value.has_value()) {
-    return false;
+    return -1;
   }
 
   /**
    * Actually defining the variable.
    */
   this->scopes.back()[variable] = value;
-  return true;
+  return this->scopes.size() - 1;
 }
 
 bool State::set_value_for_variable(const std::string &variable,
-                                   const std::any &value) {
+                                   const std::any &value, int scope) {
 
   /**
    * We now check whether the variable is already defined.
    */
   std::any current_value;
-  if (!value_for_variable(variable, current_value)) {
+  int scope_of_variable = value_for_variable(variable, current_value);
+
+  /**
+   * If we try to assign a variable in another scope than it is
+   * defined in, an error occurred. Note that value_for_variable
+   * determines the LAST scope that the variable was defined in and
+   * that the value could also be defined in the passed
+   * scope. However, we only can assign the variable in the last scope
+   * that it is defined in.
+   */
+  if (scope_of_variable != scope) {
     return false;
   }
 
@@ -80,11 +90,11 @@ bool State::set_value_for_variable(const std::string &variable,
   /**
    * Actually assigning the value.
    */
-  this->scopes.back()[variable] = value;
+  this->scopes[scope][variable] = value;
   return true;
 }
 
-bool State::value_for_variable(const std::string &variable, std::any &value) {
+int State::value_for_variable(const std::string &variable, std::any &value) {
   /**
    * Reset the value to ensure that the has_value check fails when we
    * don't find a value.
@@ -97,11 +107,11 @@ bool State::value_for_variable(const std::string &variable, std::any &value) {
 
     if (position_of_variable != this->scopes[i].end()) {
       value = position_of_variable->second;
-      return true;
+      return i;
     }
   }
 
-  return false;
+  return -1;
 }
 
 bool State::value_for_variable_in_current_scope(

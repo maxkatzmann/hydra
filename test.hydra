@@ -1,11 +1,13 @@
 print(message: "Bow to the mighty Hydra!\n")
 
-var p = Pol(r: 0.0, phi: 0.0)
-var p2 = Pol(r: 0.0, phi: 0.0)
+var a = 0.0
+var i = 0.0
 
-line(from: p, to: p2)
+for j in [0.0, 1.0, 3.0] {
+    for i in [0.0, 1.0, j] {
+        a = i * j
+        print(message: "a = \(i * j)\n")
+    }
+}
 
-clear()
-
-save(file: "my_lines.ipe")
 print(message: "Done!\n")

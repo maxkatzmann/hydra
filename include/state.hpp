@@ -57,23 +57,27 @@ class State {
   bool close_scope();
 
   /**
-   * Define the variable with the passed value. Returns false if the
-   * variable did exist already.
+   * Define the variable with the passed value. Variables are always
+   * defined in the current scope. Returns the index of the scope that
+   * the variable was defined in or -1 if the assignment failed..
    */
-  bool define_variable_with_value(const std::string &variable, const std::any &value);
+  int define_variable_with_value(const std::string &variable,
+                                 const std::any &value);
 
   /**
-   * Sets the value of the current variable. Returns false if the
-   * variable did not exist.
+   * Sets the value of the current variable in the passed
+   * scope. Returns false if the variable did not exist in this scope.
    */
-  bool set_value_for_variable(const std::string &variable, const std::any &value);
+  bool set_value_for_variable(const std::string &variable,
+                              const std::any &value, int scope);
 
   /**
    * Determines the value for a variable and stores the result in
-   * value.  If no value could be determined value_for_variable
-   * returns false and value.has_value() returns false.
+   * value.  Returns the index of the scope, that the variable is
+   * defined in. If no value could be determined, value_for_variable
+   * returns -1 and value.has_value() returns false.
    */
-  bool value_for_variable(const std::string &variable, std::any &value);
+  int value_for_variable(const std::string &variable, std::any &value);
 
   /**
    * Determines the value for a variable in the current scope and

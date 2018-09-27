@@ -26,6 +26,7 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"line", &Interpreter::function_line},
       {"print", &Interpreter::function_print},
       {"save", &Interpreter::function_save},
+      {"sqrt", &Interpreter::function_sqrt},
       {"sin", &Interpreter::function_sin},
       {"sinh", &Interpreter::function_sinh},
       {"random", &Interpreter::function_random}
@@ -231,10 +232,12 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
       DLOG(INFO) << "Assignment value interpreted successfully." << std::endl;
 
       /**
-       * Actually defining the variable.
+       * Actually defining the variable. The result of the definition
+       * is the index of the scope that the variable was defined
+       * in. If the definition failed, this will be -1.
        */
-      if (!this->system.state.define_variable_with_value(
-              input.children[1].value, value_interpretation_result)) {
+      if (this->system.state.define_variable_with_value(
+              input.children[1].value, value_interpretation_result) < 0) {
         /**
          * Defining the variable can fail for two reasons. Either the
          * value didn't actually have a value, or the variable was
@@ -291,33 +294,40 @@ bool Interpreter::interpret_assignment(const ParseResult &input,
       DLOG(INFO) << "Assignment value interpreted successfully." << std::endl;
 
       /**
-       * Check whether the variable could be assigned successfully.
+       * Check whether the variable is already defined and in what
+       * scope.
+       *
+       * The new value will then be written in that scope.
+       */
+      std::any old_value;
+      int scope = this->system.state.value_for_variable(input.children[0].value,
+                                                        old_value);
+
+      /**
+       * A scope < 0 indicates that the variable is not defined.
+       */
+      if (scope < 0) {
+        this->system.print_error_message(
+            std::string(
+                "Trying to assign to undefined variable. Define the variable "
+                "first using 'var ") +
+            input.children[0].value + " = ...' instead.");
+        return false;
+      }
+
+      /**
+       * Now we try to actually assign the value in its scope.
        */
       if (!this->system.state.set_value_for_variable(
-              input.children[0].value, value_interpretation_result)) {
+              input.children[0].value, value_interpretation_result, scope)) {
         /**
          * If the assignment fails, there are two reasons. Either the
-         * value was empty, or the variable was undefined.
+         * value was empty, or the variable was undefined. The last
+         * case was checked for before trying the assignment.
          */
-        /**
-         * Check whether we actually got a value from the
-         * interpretation.
-         */
-        if (!value_interpretation_result.has_value()) {
-          this->system.print_error_message(
-              std::string("Could not define '") + input.children[0].value +
-              "'. Right hand side of assignment did not have a value.");
-        } else {
-          /**
-           * If the result had a value, then the assignment failed
-           * because the variable was not defined yet.
-           */
-          this->system.print_error_message(
-              std::string(
-                  "Trying to assign to undefined variable. Define the variable "
-                  "first using 'var ") +
-              input.children[0].value + " = ...' instead.");
-        }
+        this->system.print_error_message(
+            std::string("Could not define '") + input.children[0].value +
+            "'. Right hand side of assignment did not have a value.");
 
         return false;
       }
@@ -561,8 +571,13 @@ bool Interpreter::interpret_loop(const ParseResult &loop, std::any &result) {
    */
   double loop_variable = lower_bound;
   std::any loop_variable_value = loop_variable;
-  this->system.state.define_variable_with_value(loop_variable_name,
-                                                loop_variable_value);
+
+  /**
+   * Since we update the value for the loop variable within the loop
+   * scope, we keep track of the index of the loop scope.
+   */
+  int loop_scope_index = this->system.state.define_variable_with_value(
+      loop_variable_name, loop_variable_value);
 
   /**
    * Now loop! We loop as long as the loop variable is smaller than
@@ -621,14 +636,18 @@ bool Interpreter::interpret_loop(const ParseResult &loop, std::any &result) {
      * Now we set the new value in the current scope.
      */
     loop_variable_value = loop_variable;
-    if (!this->system.state.set_value_for_variable(loop_variable_name,
-                                                   loop_variable_value)) {
+    if (!this->system.state.set_value_for_variable(
+            loop_variable_name, loop_variable_value, loop_scope_index)) {
       this->system.print_error_message(
           std::string(
               "Could not interpret loop. Unable to update loop variable '") +
           loop_variable_name + "'.");
       return false;
     }
+
+#ifdef DEBUG
+    print_scopes();
+    #endif
   }
 
   /**
@@ -1226,17 +1245,18 @@ bool Interpreter::interpret_variable(const ParseResult &input,
   this->system.state.line_number = input.line_number;
 
   /**
-   * We now check whether the variable is defined.
+   * We now check whether the variable is defined. The result of the
+   * check is the scope that the variable was defined in, or -1 if the
+   * variable was not defined.
    */
-  bool success = this->system.state.value_for_variable(input.value, result);
-
-  if (!success) {
+  if (this->system.state.value_for_variable(input.value, result) < 0) {
     this->system.print_error_message(
         std::string("Use of undeclared variable '") + input.value +
-        "'. Declare the variable first using 'var " + input.value + " = ...");
+        "'. Declare the variable first using 'var " + input.value + " = ...'");
+    return false;
   }
 
-  return success;
+  return true;
 }
 
 bool Interpreter::interpret_function(const ParseResult &function_call,
