@@ -147,6 +147,47 @@ bool Interpreter::function_cosh(const ParseResult &function_call,
   return true;
 }
 
+bool Interpreter::function_curve_angle(const ParseResult &function_call,
+                                       std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments. Note, that we don't interpret all
+   * arguments initially. That is because the last argument might
+   * contain the hidden variable _p which will only be evaluated when
+   * _p is known.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  interpret_arguments_from_function_call(function_call, interpreted_arguments,
+                                         {"from", "to"});
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  Pol from;
+  if (!pol_value_for_parameter("from", interpreted_arguments, from)) {
+    return false;
+  }
+
+  Pol to;
+  if (!pol_value_for_parameter("to", interpreted_arguments, to)) {
+    return false;
+  }
+
+  /**
+   * Add the line to the canvas.
+   */
+  Path line_path;
+  Canvas::path_for_line(from, to, this->canvas.resolution, line_path);
+  this->canvas.add_path(line_path);
+
+  return true;
+}
+
 bool Interpreter::function_exp(const ParseResult &function_call,
                                std::any &result) {
   DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
@@ -450,4 +491,71 @@ bool Interpreter::function_sinh(const ParseResult &function_call,
   result = ::sinh(x);
   return true;
 }
+
+bool Interpreter::function_theta(const ParseResult &function_call,
+                                 std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+
+  /**
+   * Now we try to obtain the actual argument values.
+   */
+  double r_1;
+  double r_2;
+  double R;
+
+  /**
+   * Try interpreting the parameters.
+   */
+  if (!number_value_for_parameter("r1", interpreted_arguments, r_1) ||
+      !number_value_for_parameter("r2", interpreted_arguments, r_2) ||
+      !number_value_for_parameter("R", interpreted_arguments, R)) {
+    return false;
+  }
+
+  /**
+   * Check whether the argument value are valid.
+   */
+  if (r_1 > R || r_2 > R) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_call.value +
+        "'. Argument 'r1' and 'r2' must not be larger than 'R'.");
+    return false;
+  }
+
+  if (r_1 + r_2 < R) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_call.value +
+        "'. The sum of the arguments 'r1' and 'r2' must be at least 'R'.");
+    return false;
+  }
+
+  /**
+   * Actually computing the value.
+   */
+  double theta = Pol::theta(r_1, r_2, R);
+
+  /**
+   * A value smaller 0.0 indicates that the value could not be
+   * computed because of numerical issues.
+   */
+  if (theta < 0.0) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_call.value +
+        "'. The value could not be computed due to numerical issues.");
+    return false;
+  }
+
+  result = theta;
+  return true;
 }
+}  // namespace hydra

@@ -44,6 +44,12 @@ enum Type {
 };
 
 /**
+ * We use unordered_maps from string to any to store properties of
+ * non-primitive types.
+ */
+typedef std::unordered_map<std::string, std::any> PropertyMap;
+
+/**
  * How functions are represented in hydra.
  */
 struct Func {
@@ -70,6 +76,7 @@ class System {
  public:
 
   static const std::string error_string;
+  static const std::string type_string;
 
   /**
    * Constructor

@@ -403,38 +403,61 @@ bool Interpreter::interpret_initialization(const ParseResult &initialization,
    * Now depending on which type to evaluate we initialize it.
    */
 
+  // /**
+  //  * Evaluating Pol (Polar coordinates).
+  //  */
+  // if (initialization.value == "Pol") {
+
+  //   /**
+  //    * Get the actual argument values.
+  //    */
+  //   double r;
+  //   double phi;
+
+  //   /**
+  //    * Get the numbers for the parameters.
+  //    */
+  //   if (!number_value_for_parameter("r", arguments, r) ||
+  //       !number_value_for_parameter("phi", arguments, phi)) {
+  //     return false;
+  //   }
+
+  //   /**
+  //    * If we're at this point, we all we need for the initialization.
+  //    */
+  //   result = Pol(r, phi);
+  //   return true;
+  // } else {
+  //   this->system.print_error_message(std::string("Could not interpret '") +
+  //                                    initialization.value +
+  //                                    "'. No initialization definition found.");
+  //   return false;
+  // }
+
   /**
-   * Evaluating Pol (Polar coordinates).
+   * Non-primitive types are defined using maps. The maps contains a
+   * key for the type and one for each property.
    */
-  if (initialization.value == "Pol") {
+  PropertyMap property_map;
 
-    /**
-     * Get the actual argument values.
-     */
-    double r;
-    double phi;
+  /**
+   * Assign the type.
+   */
+  property_map[System::type_string] = initialization.value;
 
-    /**
-     * Get the numbers for the parameters.
-     */
-    if (!number_value_for_parameter("r", arguments, r) ||
-        !number_value_for_parameter("phi", arguments, phi)) {
-      return false;
-    }
-
-    /**
-     * If we're at this point, we all we need for the initialization.
-     */
-    result = Pol(r, phi);
-    return true;
-  } else {
-    this->system.print_error_message(std::string("Could not interpret '") +
-                                     initialization.value +
-                                     "'. No initialization definition found.");
-    return false;
+  /**
+   * Assign the properties from the initialization.
+   */
+  for (const std::pair<std::string, std::any> &property_value : arguments) {
+    property_map[property_value.first] = property_value.second;
   }
 
-  return false;
+  /**
+   * The result is the property map.
+   */
+  result = property_map;
+
+  return true;
 }
 
 bool Interpreter::interpret_loop(const ParseResult &loop, std::any &result) {
@@ -1502,10 +1525,59 @@ bool Interpreter::pol_value_for_parameter(
   }
 
   /**
-   * Check whether the value can be cast to Pol.
+   * Check whether the value can be cast to a PropertyMap.
    */
   try {
-    value = std::any_cast<Pol>(argument_value);
+    PropertyMap property_map = std::any_cast<PropertyMap>(argument_value);
+
+    /**
+     * Check whether the type of the object is Pol.
+     */
+    PropertyMap::const_iterator position_of_type = property_map.find(System::type_string);
+
+    if (position_of_type == property_map.end()) {
+      this->system.print_error_message(
+          std::string("Property map found while interpreting parameter '") +
+          parameter + "' did not contain the type of the object.");
+      return false;
+    }
+
+    /**
+     * Try to cast the type as string.
+     */
+    std::string type_string;
+    try {
+      type_string = std::any_cast<std::string>(position_of_type->second);
+    } catch (std::bad_any_cast &bac) {
+      this->system.print_error_message(
+          std::string(
+              "Type of property map found while interpreting parameter '") +
+          parameter + "' could not be determined.");
+      return false;
+    }
+
+    /**
+     * Check whether we actually found a Pol object.
+     */
+    if (type_string != "Pol") {
+      this->system.print_error_message(
+          std::string("Unexpectedly found '") + type_string +
+          "' while trying to interpret 'Pol' for parameter: '" + parameter +
+          "'.");
+      return false;
+    }
+
+    /**
+     * Now we try to get the properties.
+     */
+    double r;
+    double phi;
+    if (!number_value_for_parameter("r", property_map, r) ||
+        !number_value_for_parameter("phi", property_map, phi)) {
+      return false;
+    }
+
+    value = Pol(r, phi);
     return true;
   } catch (std::bad_any_cast &bac) {
     this->system.print_error_message(
@@ -1570,10 +1642,89 @@ bool Interpreter::string_representation_of_interpretation_result(
   }
 
   /**
-   * Check whether is a Pol object.
+   * Check whether is a property map.
    */
   try {
-    str = std::any_cast<Pol>(result).to_string();
+
+    /**
+     * Cast to property map.
+     */
+    PropertyMap property_map = std::any_cast<PropertyMap>(result);
+    try {
+      /**
+       * Try to get the type of the object.
+       */
+      std::string type_string =
+          std::any_cast<std::string>(property_map[System::type_string]);
+
+      /**
+       * Now that we have the type, we try to get the properties of
+       * this type.
+       */
+      std::unordered_map<std::string, Func>::const_iterator
+        position_of_function_arguments =
+        this->system.known_functions.find(type_string);
+
+      if (position_of_function_arguments == this->system.known_functions.end()) {
+        this->system.print_error_message(
+            std::string("Could not find expected properties for type '") +
+            type_string + "'.");
+        return false;
+      }
+
+      /**
+       * Print the type of the object.
+       */
+      str = type_string + "(";
+
+      /**
+       * Iterate and print the properties.
+       */
+      for (int index = 0;
+           index < (int)position_of_function_arguments->second.arguments.size();
+           ++index) {
+        std::string property_name =
+            position_of_function_arguments->second.arguments[index];
+
+        str += property_name  + ": ";
+
+        /**
+         * Try to get the value for this property.
+         */
+        std::unordered_map<std::string, std::any>::const_iterator
+            position_of_property = property_map.find(property_name);
+
+        if (position_of_property == property_map.end()) {
+          this->system.print_error_message(
+              std::string("Could not find property '") + property_name +
+              "' for type '" + type_string + "'.");
+          return false;
+        }
+
+        /**
+         * Get the string representation of the property value.
+         */
+        std::string property_value;
+        if (!string_representation_of_interpretation_result(
+                position_of_property->second, property_value)) {
+          return false;
+        }
+
+        str += property_value;
+
+        if (index < (int)position_of_function_arguments->second.arguments.size() - 1) {
+          str += ", ";
+        } else {
+          str += ")";
+        }
+      }
+
+      return true;
+
+    } catch (std::bad_any_cast &bac){
+      return false;
+    }
+
     return true;
   } catch (const std::bad_any_cast &bac) {
   }
@@ -1587,8 +1738,8 @@ bool Interpreter::string_representation_of_interpretation_result(
 bool Interpreter::print_interpretation_result(const std::any &result) {
 
   std::string string_representation;
-  if (Interpreter::string_representation_of_interpretation_result(
-          result, string_representation)) {
+  if (string_representation_of_interpretation_result(result,
+                                                     string_representation)) {
     std::cout << string_representation;
     return true;
   }

@@ -219,6 +219,7 @@ namespace hydra {
     bool function_clear(const ParseResult &function_call, std::any &result);
     bool function_cos(const ParseResult &function_call, std::any &result);
     bool function_cosh(const ParseResult &function_call, std::any &result);
+    bool function_curve_angle(const ParseResult &function_call, std::any &result);
     bool function_exp(const ParseResult &function_call, std::any &result);
     bool function_log(const ParseResult &function_call, std::any &result);
     bool function_line(const ParseResult &function_call, std::any &result);
@@ -228,19 +229,20 @@ namespace hydra {
     bool function_sqrt(const ParseResult &function_call, std::any &result);
     bool function_sin(const ParseResult &function_call, std::any &result);
     bool function_sinh(const ParseResult &function_call, std::any &result);
+    bool function_theta(const ParseResult &function_call, std::any &result);
 
     /**
      * Determines the string representation of an interpretation
      * result. Returns false if no representation could be obtained.
      */
-    static bool string_representation_of_interpretation_result(
-        const std::any &result, std::string &str);
+    bool string_representation_of_interpretation_result(const std::any &result,
+                                                        std::string &str);
 
     /**
      * Tries to find out what type the result is and cast it in order
      * to print it.
      */
-    static bool print_interpretation_result(const std::any &result);
+    bool print_interpretation_result(const std::any &result);
 
     /**
      * Print scopes.

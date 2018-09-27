@@ -1,13 +1,10 @@
 print(message: "Bow to the mighty Hydra!\n")
 
-var a = 0.0
-var i = 0.0
+var a = Pol(r: 2.0, phi: 3.0 * M_PI / 4.0)
+var b = Pol(r: 3.0, phi: M_PI / 4.0)
 
-for j in [0.0, 1.0, 3.0] {
-    for i in [0.0, 1.0, j] {
-        a = i * j
-        print(message: "a = \(i * j)\n")
-    }
-}
+line(from: a, to: b)
+circle(center: b, radius: 4.0)
+save(file: "my_lines.ipe")
 
 print(message: "Done!\n")

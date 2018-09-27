@@ -12,6 +12,7 @@
 namespace hydra {
 
 const std::string System::error_string = "__ERROR__";
+const std::string System::type_string = "__TYPE__";
 
 const std::unordered_map<Type, std::string, std::hash<int>>
     System::name_for_type = {
