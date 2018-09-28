@@ -1,7 +1,9 @@
 print(message: "Bow to the mighty Hydra!\n")
 
-var a = Pol(r: 2.0, phi: 3.0 * M_PI / 4.0)
-var b = a.r
-var c = a.r * a.phi
+var R = 10.0;
+circle(center: Pol(r: 0.0, phi: 0.0), radius: R)
+curve_angle(from: Pol(r: R / 2.0, phi: 0.0), to: Pol(r: R, phi: 0.0), angle: theta(r1: _p.r, r2: _p.r, R: R))
+
+save(file: "my_curve.ipe")
 
 print(message: "Done!\n")

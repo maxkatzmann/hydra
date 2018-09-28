@@ -21,15 +21,17 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"circle", &Interpreter::function_circle},
       {"cos", &Interpreter::function_cos},
       {"cosh", &Interpreter::function_cosh},
+      {"curve_angle", &Interpreter::function_curve_angle},
       {"exp", &Interpreter::function_exp},
       {"log", &Interpreter::function_log},
       {"line", &Interpreter::function_line},
       {"print", &Interpreter::function_print},
+      {"random", &Interpreter::function_random},
       {"save", &Interpreter::function_save},
       {"sqrt", &Interpreter::function_sqrt},
       {"sin", &Interpreter::function_sin},
       {"sinh", &Interpreter::function_sinh},
-      {"random", &Interpreter::function_random}
+      {"theta", &Interpreter::function_theta}
   };
 
   this->known_interpretations = {
@@ -397,7 +399,9 @@ bool Interpreter::interpret_initialization(const ParseResult &initialization,
    * Now we actually interpret the argument list.
    */
   std::unordered_map<std::string, std::any> arguments;
-  interpret_arguments_from_function_call(initialization, arguments);
+  if (!interpret_arguments_from_function_call(initialization, arguments)) {
+    return false;
+  }
 
   /**
    * Now depending on which type to evaluate we initialize it.

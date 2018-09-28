@@ -1265,6 +1265,7 @@ bool Lexer::parse_initialization(const std::vector<Token> &tokens,
     }
 
     ParseResult argument_parse_result;
+    argument_parse_result.line_number = result.line_number;
     bool success = Lexer::parse_argument_list(
         tokens[0].children, position_of_arguments->second.arguments,
         argument_parse_result);

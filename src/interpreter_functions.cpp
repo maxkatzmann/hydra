@@ -28,7 +28,10 @@ bool Interpreter::function_clear(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * If there are arguments, something went wrong. Clear is not
@@ -61,7 +64,10 @@ bool Interpreter::function_circle(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -99,7 +105,10 @@ bool Interpreter::function_cos(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -129,7 +138,10 @@ bool Interpreter::function_cosh(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -162,8 +174,10 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
    * _p is known.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments,
-                                         {"from", "to"});
+  if (!interpret_arguments_from_function_call(function_call, interpreted_arguments,
+                                              {"from", "to"})) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -179,11 +193,107 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
   }
 
   /**
-   * Add the line to the canvas.
+   * Check whether they both have the same angular coordinate. If not
+   * we print an error.
    */
-  Path line_path;
-  Canvas::path_for_line(from, to, this->canvas.resolution, line_path);
-  this->canvas.add_path(line_path);
+  if (from.phi != to.phi) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_call.value +
+        "'. The angular coordinates of the two endpoints did not match: '" +
+        std::to_string(from.phi) + "' vs. '" + std::to_string(to.phi) + "'.");
+    return false;
+  }
+
+  /**
+   * Make sure that the from coordinate has a smaller radius than the
+   * to coordinate.
+   */
+  if (from.r > to.r) {
+    Pol temp = from;
+    from = to;
+    to = from;
+  }
+
+  /**
+   * Add the curve to the canvas.
+   */
+  Path path;
+  path.is_closed = false;
+
+  /**
+   * We create the points of the path by iteratively increasing the
+   * radius, and evaluating the angle argument.
+   */
+  double step_size = (to.r - from.r) / this->canvas.resolution;
+
+  double radius = from.r;
+
+  /**
+   * We add current point (on the line) as the hidden variable _p to
+   * the current scope.
+   */
+  PropertyMap current_point;
+  current_point[System::type_string] = "Pol";
+  current_point["r"] = radius;
+  current_point["phi"] = from.phi;
+
+  const std::string hidden_variable_name = "_p";
+
+  int current_scope =
+      this->system.state.define_variable_with_value(hidden_variable_name, current_point);
+
+  /**
+   * In the loop we iteratively evaluate the angle argument.
+   */
+  std::unordered_map<std::string, std::any> interpreted_angle_argument;
+  double angle = 0.0;
+
+  while (radius <= to.r) {
+
+    /**
+     * Now that the hidden variable is defined, we interpret the angle
+     * argument.
+     */
+    if (!interpret_arguments_from_function_call(function_call, interpreted_angle_argument,
+                                                {"angle"})) {
+      return false;
+    }
+
+    /**
+     * We try to get the angle value.
+     */
+    if (!number_value_for_parameter("angle", interpreted_angle_argument,
+                                    angle)) {
+      return false;
+    }
+
+    /**
+     * Create the point with the determined angle.
+     */
+    Pol point(radius, from.phi + angle);
+
+    /**
+     * Add the point to the path.
+     */
+    path.push_back(point);
+
+    /**
+     * Increase the radius.
+     */
+    radius += step_size;
+
+    /**
+     * Update the radius of the hidden variable _p.
+     */
+    current_point["r"] = radius;
+    this->system.state.set_value_for_variable(hidden_variable_name,
+                                              current_point, current_scope);
+  }
+
+  /**
+   * Actually adding the path to the canvas.
+   */
+  this->canvas.add_path(path);
 
   return true;
 }
@@ -200,7 +310,10 @@ bool Interpreter::function_exp(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -230,7 +343,10 @@ bool Interpreter::function_print(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -264,7 +380,10 @@ bool Interpreter::function_log(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -294,7 +413,10 @@ bool Interpreter::function_line(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -332,7 +454,10 @@ bool Interpreter::function_random(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument values.
@@ -385,7 +510,10 @@ bool Interpreter::function_save(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -414,7 +542,10 @@ bool Interpreter::function_sqrt(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -444,7 +575,10 @@ bool Interpreter::function_sin(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -474,7 +608,10 @@ bool Interpreter::function_sinh(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument value.
@@ -504,7 +641,10 @@ bool Interpreter::function_theta(const ParseResult &function_call,
    * Interpret the arguments.
    */
   std::unordered_map<std::string, std::any> interpreted_arguments;
-  interpret_arguments_from_function_call(function_call, interpreted_arguments);
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
 
   /**
    * Now we try to obtain the actual argument values.
