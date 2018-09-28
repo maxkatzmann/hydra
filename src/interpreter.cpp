@@ -28,9 +28,10 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"print", &Interpreter::function_print},
       {"random", &Interpreter::function_random},
       {"save", &Interpreter::function_save},
-      {"sqrt", &Interpreter::function_sqrt},
+      {"set_resolution", &Interpreter::function_set_resolution},
       {"sin", &Interpreter::function_sin},
       {"sinh", &Interpreter::function_sinh},
+      {"sqrt", &Interpreter::function_sqrt},
       {"theta", &Interpreter::function_theta}
   };
 

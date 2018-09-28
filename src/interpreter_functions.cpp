@@ -224,14 +224,29 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
    * We create the points of the path by iteratively increasing the
    * radius, and evaluating the angle argument.
    */
-  double step_size = (to.r - from.r) / this->canvas.resolution;
+  const double step_size = (to.r - from.r) / this->canvas.resolution;
+  DLOG(INFO) << "Step size: " << step_size << std::endl;
+
+  /**
+   * If the step size is not positive, we will run into an infinite
+   * loop. We rather throw an error before.
+   */
+  if (!(step_size > 0)) {
+    this->system.print_error_message(
+        std::string("Invalid step size <= 0 in function '") +
+        function_call.value +
+        "'. Make sure that 'to' and 'from' are not the same point.");
+    return false;
+  }
 
   double radius = from.r;
 
   /**
    * We add current point (on the line) as the hidden variable _p to
-   * the current scope.
+   * a new scope that will only live for this function execution.
    */
+  this->system.state.open_new_scope();
+
   PropertyMap current_point;
   current_point[System::type_string] = "Pol";
   current_point["r"] = radius;
@@ -288,6 +303,16 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
     current_point["r"] = radius;
     this->system.state.set_value_for_variable(hidden_variable_name,
                                               current_point, current_scope);
+  }
+
+  /**
+   * We now close the scope that holds the hidden variable.
+   */
+  if (!this->system.state.close_scope()) {
+    this->system.print_error_message(std::string(
+        "Could not close hidden variable scope as that would mean closing the "
+        "last scope."));
+    return false;
   }
 
   /**
@@ -530,8 +555,8 @@ bool Interpreter::function_save(const ParseResult &function_call,
   return true;
 }
 
-bool Interpreter::function_sqrt(const ParseResult &function_call,
-                                std::any &result) {
+bool Interpreter::function_set_resolution(const ParseResult &function_call,
+                                          std::any &result) {
   DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
   /**
    * Reset the result so the check for has_value fails.
@@ -557,9 +582,20 @@ bool Interpreter::function_sqrt(const ParseResult &function_call,
   }
 
   /**
-   * Compute the result.
+   * The step size has to be positive.
    */
-  result = ::sqrt(x);
+  if (!(x > 0.0)) {
+    this->system.print_error_message(
+        std::string("Invalid argument in function '") + function_call.value +
+        "'. Cannot set non-positive resolution.");
+    return false;
+  }
+
+  /**
+   * Set the resolution of the canvas.
+   */
+  this->canvas.resolution = x;
+  result = x;
   return true;
 }
 
@@ -629,6 +665,39 @@ bool Interpreter::function_sinh(const ParseResult &function_call,
   return true;
 }
 
+bool Interpreter::function_sqrt(const ParseResult &function_call,
+                                std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  double x;
+
+  if (!number_value_for_parameter("x", interpreted_arguments, x)) {
+    return false;
+  }
+
+  /**
+   * Compute the result.
+   */
+  result = ::sqrt(x);
+  return true;
+}
+
 bool Interpreter::function_theta(const ParseResult &function_call,
                                  std::any &result) {
   DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
@@ -668,7 +737,9 @@ bool Interpreter::function_theta(const ParseResult &function_call,
   if (r_1 > R || r_2 > R) {
     this->system.print_error_message(
         std::string("Could not interpret '") + function_call.value +
-        "'. Argument 'r1' and 'r2' must not be larger than 'R'.");
+        "'. Argument 'r1' and 'r2' must not be larger than 'R'. (r1 = " +
+        std::to_string(r_1) + ", r2 = " + std::to_string(r_2) +
+        "', R = " + std::to_string(R) + ")");
     return false;
   }
 

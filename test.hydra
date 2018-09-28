@@ -1,9 +1,22 @@
 print(message: "Bow to the mighty Hydra!\n")
 
 var R = 10.0;
-circle(center: Pol(r: 0.0, phi: 0.0), radius: R)
-curve_angle(from: Pol(r: R / 2.0, phi: 0.0), to: Pol(r: R, phi: 0.0), angle: theta(r1: _p.r, r2: _p.r, R: R))
 
+// Draw a circle with radius R centered at the origin.
+circle(center: Pol(r: 0.0, phi: 0.0), radius: R)
+
+// Increase the resolution
+set_resolution(x: 1000)
+
+// Define the points that form the basis of the curve.
+var start = Pol(r: R / 2.0, phi: 0.0)
+var end = Pol(r: R, phi: 0.0)
+
+// Draw the curves.
+curve_angle(from: start, to: end, angle: theta(r1: _p.r, r2: _p.r, R: R))
+curve_angle(from: start, to: end, angle: 0 - theta(r1: _p.r, r2: _p.r, R: R))
+
+// Save the file.
 save(file: "my_curve.ipe")
 
 print(message: "Done!\n")
