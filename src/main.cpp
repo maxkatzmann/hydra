@@ -33,6 +33,11 @@
 // DEFINE_string(flag, "", "A test flag that takes a string.");
 
 /**
+ * Forward declarations.
+ */
+void interpret_code_from_file(const std::string &file_name);
+
+/**
  * Main procedure
  */
 int main(int argc, char *argv[]) {
@@ -54,6 +59,27 @@ int main(int argc, char *argv[]) {
    */
   FLAGS_logtostderr = 1;
 
+
+  /**
+   * Check whether a file name was passed as argument.
+   */
+  if (argc > 1) {
+    std::string file_name(argv[1]);
+
+    /**
+     * We got a file, so we try to interpret its code.
+     */
+    interpret_code_from_file(file_name);
+  }
+
+  return 0;
+}
+
+/**
+ * Reads and interprets code from a hydra file.
+ */
+void interpret_code_from_file(const std::string &file_name) {
+
   hydra::System system;
   hydra::Lexer lexer(system);
   hydra::Interpreter interpreter(system);
@@ -63,16 +89,10 @@ int main(int argc, char *argv[]) {
    */
   std::vector<std::string> code;
 
-  /**
-   * Check whether a file name was passed as argument.
-   */
-  if (argc > 1) {
-    std::string file_name(argv[1]);
+  DLOG(INFO) << "Reading code from file: '" << file_name << "'..." << std::endl;
+  hydra::IOHelper::read_code_from_file(file_name, code);
 
-    DLOG(INFO) << "Reading code from file: '" << file_name << "'..." << std::endl;
-    hydra::IOHelper::read_code_from_file(file_name, code);
-  }
-
+  #ifdef DEBUG
   std::cout << "Interpreting code: " << std::endl << std::endl;
   for (int line = 0; line < (int)code.size(); ++line) {
     std::string code_line = code[line];
@@ -87,6 +107,7 @@ int main(int argc, char *argv[]) {
     std::cout << line + 1 << "| " << code_line << std::endl;
   }
   std::cout << std::endl;
+  #endif
 
   /**
    * First parse the whole code.
@@ -109,12 +130,11 @@ int main(int argc, char *argv[]) {
    */
   std::any interpretation_result;
   if (!interpreter.interpret_code(parsed_code, interpretation_result)) {
-    std::cerr << "Code could not be interpreted..." << std::endl;
+    std::cerr << "Code could not be interpreted successfully." << std::endl;
   }
 
   #ifdef DEBUG
   interpreter.print_scopes();
   #endif
 
-  return 0;
 }

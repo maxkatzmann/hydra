@@ -6,7 +6,7 @@ var R = 10.0;
 circle(center: Pol(r: 0.0, phi: 0.0), radius: R)
 
 // Increase the resolution
-set_resolution(x: 1000)
+set_resolution(x: 500)
 
 // Define the points that form the basis of the curve.
 var start = Pol(r: R / 2.0, phi: 0.0)

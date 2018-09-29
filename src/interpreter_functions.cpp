@@ -228,6 +228,14 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
   DLOG(INFO) << "Step size: " << step_size << std::endl;
 
   /**
+   * While we are closer to the origin, we need finer steps in order
+   * to get a smooth circle.
+   */
+  double additional_detail_threshold = 5.0 * step_size;
+  double additional_detail_points = this->canvas.resolution / 5.0;
+  double additional_step_size = step_size / additional_detail_points;
+
+  /**
    * If the step size is not positive, we will run into an infinite
    * loop. We rather throw an error before.
    */
@@ -263,7 +271,45 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
   std::unordered_map<std::string, std::any> interpreted_angle_argument;
   double angle = 0.0;
 
+  /**
+   * Since we have several levels of detail (closer to the origin, we
+   * have a smaller step size) but we have to use the same mechanism
+   * for all these points, we create a vector containing all the
+   * radii, that we need.
+   */
+  std::vector<double> radii;
+
   while (radius <= to.r) {
+
+    radii.push_back(radius);
+
+    /**
+     * When we are close to the origin, we add additional detail.
+     */
+    if (radius < from.r + additional_detail_threshold) {
+
+      double additional_r = radius + additional_step_size;
+
+      while (additional_r < radius + step_size) {
+
+        radii.push_back(additional_r);
+        DLOG(INFO) << "Added additional radius: " << additional_r << std::endl;
+
+        additional_r += additional_step_size;
+      }
+    }
+
+    radius += step_size;
+  }
+
+  for (const double &r : radii) {
+
+    /**
+     * Update the radius of the hidden variable _p.
+     */
+    current_point["r"] = r;
+    this->system.state.set_value_for_variable(hidden_variable_name,
+                                              current_point, current_scope);
 
     /**
      * Now that the hidden variable is defined, we interpret the angle
@@ -285,24 +331,12 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
     /**
      * Create the point with the determined angle.
      */
-    Pol point(radius, from.phi + angle);
+    Pol point(r, from.phi + angle);
 
     /**
      * Add the point to the path.
      */
     path.push_back(point);
-
-    /**
-     * Increase the radius.
-     */
-    radius += step_size;
-
-    /**
-     * Update the radius of the hidden variable _p.
-     */
-    current_point["r"] = radius;
-    this->system.state.set_value_for_variable(hidden_variable_name,
-                                              current_point, current_scope);
   }
 
   /**
