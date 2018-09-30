@@ -21,7 +21,7 @@ Lexer::Lexer(System &system) : system(system) {
       {Function, &Lexer::parse_function},
       {Initialization, &Lexer::parse_initialization},
       {Number, &Lexer::parse_number},
-      {Parenthesis, &Lexer::parse_parenthesis},
+      {Braces, &Lexer::parse_brace},
       {Range, &Lexer::parse_range},
       {String, &Lexer::parse_string_token}
   };
@@ -715,8 +715,8 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
      * Let the system know about which line we're currently dealing
      * with.
      */
-    this->system.line_number = line_number;
-    this->system.current_line = code[line_number];
+    this->system.state.line_number = line_number;
+    this->system.state.current_line = code[line_number];
 
     /**
      * Parse the line.
@@ -729,6 +729,9 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
      */
     line_parse_result.line_number = line_number + 1;
 
+    /**
+     * Parsing the current line.
+     */
     if (!parse_string(code[line_number], line_parse_result)) {
       return false;
     }
@@ -746,9 +749,9 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
        * Keep track of the line number associated with this loop.
        */
       line_number_for_scope.push_back(line_parse_result.line_number);
-    } else if (line_parse_result.type == Parenthesis) {
+    } else if (line_parse_result.type == Braces) {
       /**
-       * If the line is of type Parenthesis, it is meant to close a
+       * If the line is of type Braces, it is meant to close a
        * loop. We close the loop by removing the children vector of
        * the loop-parse-result from the code_scopes vector.
        */
@@ -774,7 +777,7 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
   if (code_scopes.size() != 1) {
     this->system.print_error_message(
         std::string(
-            "Could not parse code. Missing parenthesis to loop in line: ") +
+            "Could not parse code. Missing brace to loop in line: ") +
         std::to_string(line_number_for_scope.back()) + ".");
     return false;
   }
@@ -1430,11 +1433,10 @@ bool Lexer::parse_number(const std::vector<Token> &tokens,
   return true;
 }
 
-bool Lexer::parse_parenthesis(const std::vector<Token> &tokens,
-                              ParseResult &result) {
+bool Lexer::parse_brace(const std::vector<Token> &tokens, ParseResult &result) {
   /**
-   * A line that contains a parenthesis has to have exactly one token
-   * and that token is the parenthesis.
+   * A line that contains a brace has to have exactly one token
+   * and that token is the brace.
    */
   if (tokens.size() != 1) {
     result.type = Error;
@@ -1445,18 +1447,18 @@ bool Lexer::parse_parenthesis(const std::vector<Token> &tokens,
   }
 
   /**
-   * A token representing a parenthesis has to be '}'.
+   * A token representing a brace has to be '}'.
    */
   if (tokens[0].value != "}") {
 
     result.type = Error;
     /**
-     * If it is a '{' instead, maybe the opening parenthesis of a
+     * If it is a '{' instead, maybe the opening brace of a
      * for-loop was placed on a new line. Which we don't allow.
      */
     if (tokens[0].value == "{") {
       this->system.print_error_message(std::string(
-          "A line must not start with '{', please place parentheses of "
+          "A line must not start with '{', please place braces of "
           "for-loops in the same line as the loop-definition."));
     } else {
       this->system.print_error_message(
@@ -1467,7 +1469,7 @@ bool Lexer::parse_parenthesis(const std::vector<Token> &tokens,
     return false;
   }
 
-  result.type = Parenthesis;
+  result.type = Braces;
   result.value = tokens[0].value;
   return true;
 }

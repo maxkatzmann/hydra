@@ -35,7 +35,7 @@ enum Type {
   Initialization = 8,
   Number = 9,
   Operator = 10,
-  Parenthesis = 11,
+  Braces = 11,
   Property = 12,
   Range = 13,
   String = 14,
@@ -83,17 +83,6 @@ class System {
    * Constructor
    */
   System();
-
-  /**
-   * This doesn't feel right but I have no better place, yet, so the
-   * system stores the current line number.
-   */
-  int line_number = -1;
-
-  /**
-   * Also not sure whether the system should
-   */
-  std::string current_line = "";
 
   /**
    * The system has a state that encapsulate what the program has seen

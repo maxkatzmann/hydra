@@ -226,6 +226,11 @@ void launch_REPL() {
     code.push_back(code_line);
 
     /**
+     * For better error messages.
+     */
+    system.state.line_number = code.size();
+
+    /**
      * If the user didn't quit, we try to parse the entered code.
      */
     hydra::ParseResult parse_result;
@@ -247,7 +252,7 @@ void launch_REPL() {
      */
     if (parse_result.type == hydra::Loop) {
       ++number_of_open_for_loops;
-    } else if (parse_result.type == hydra::Parenthesis) {
+    } else if (parse_result.type == hydra::Braces) {
       /**
        * If we find a parenthesis, it is closing a loop.
        */
@@ -273,7 +278,7 @@ void launch_REPL() {
 
       std::any result;
       if (!interpreter.interpret_code(parsed_code, result)) {
-        std::cerr << "Could not interpret code." << std::endl;
+        std::cerr << "(Code was not interpreted.)" << std::endl;
 
         /**
          * An error occurred we start over, with out having any code

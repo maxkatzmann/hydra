@@ -199,10 +199,10 @@ class Lexer {
   bool parse_number(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
-   * Parses a string that represents a parenthesis.  If the parsed
-   * string is not a parenthesis, the result will have type Error.
+   * Parses a string that represents a brace.  If the parsed
+   * string is not a brace, the result will have type Error.
    */
-  bool parse_parenthesis(const std::vector<Token> &tokens, ParseResult &result);
+  bool parse_brace(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents a range.  If the parsed string
