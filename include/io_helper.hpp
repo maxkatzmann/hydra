@@ -36,6 +36,12 @@ class IOHelper {
    */
   static void read_code_from_file(const std::string &file_name,
                                   std::vector<std::string> &code);
+
+  /**
+   * Converts all occurrences of the sequence '\n' to an actual new
+   * line character.
+   */
+  static void convert_new_lines(std::string &str);
 };
 }  // namespace hydra
 

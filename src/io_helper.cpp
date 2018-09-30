@@ -71,38 +71,7 @@ void IOHelper::read_code_from_file(const std::string &file_name,
          * We may need to manipulate the code_line.
          */
         std::string code_line = line;
-
-        /**
-         * Replace \n with actual new line in the string. We somehow
-         * can't search for '\\n' (that found find 'n' as
-         * well). Therefore, we first search for '\' and check
-         * whether the next character is n...
-         */
-        int position_of_possible_newline = code_line.find_first_of("\\");
-
-        DLOG(INFO) << "Found possible newline at: "
-                   << position_of_possible_newline << std::endl;
-
-        while (position_of_possible_newline != (int)std::string::npos &&
-               position_of_possible_newline < (int)code_line.length() - 1) {
-          DLOG(INFO) << "Position of possible new line is within bounds."
-                     << std::endl;
-
-          if (code_line[position_of_possible_newline + 1] == 'n') {
-            DLOG(INFO) << "Found n after possible new line." << std::endl;
-
-            /**
-             * Now we have found a new line.
-             */
-            code_line.replace(position_of_possible_newline, 2, "\n");
-          }
-
-          /**
-           * Find the next new line.
-           */
-          position_of_possible_newline =
-              code_line.find_first_of("\\", position_of_possible_newline + 1);
-        }
+        convert_new_lines(code_line);
 
         /**
          * Add the line of code.
@@ -115,4 +84,39 @@ void IOHelper::read_code_from_file(const std::string &file_name,
         return true;
       });
 }
+
+void IOHelper::convert_new_lines(std::string &str) {
+  /**
+   * Replace \n with actual new line in the string. We somehow
+   * can't search for '\\n' (that found find 'n' as
+   * well). Therefore, we first search for '\' and check
+   * whether the next character is n...
+   */
+  int position_of_possible_newline = str.find_first_of("\\");
+
+  DLOG(INFO) << "Found possible newline at: " << position_of_possible_newline
+             << std::endl;
+
+  while (position_of_possible_newline != (int)std::string::npos &&
+         position_of_possible_newline < (int)str.length() - 1) {
+    DLOG(INFO) << "Position of possible new line is within bounds."
+               << std::endl;
+
+    if (str[position_of_possible_newline + 1] == 'n') {
+      DLOG(INFO) << "Found n after possible new line." << std::endl;
+
+      /**
+       * Now we have found a new line.
+       */
+      str.replace(position_of_possible_newline, 2, "\n");
+    }
+
+    /**
+     * Find the next new line.
+     */
+    position_of_possible_newline =
+        str.find_first_of("\\", position_of_possible_newline + 1);
+  }
+}
+
 }  // namespace hydra
