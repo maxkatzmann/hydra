@@ -28,6 +28,8 @@ Hydra can be used in two ways. First, you can create a file containing Hydra cod
 
 On the other hand, Hydra comes equipped with a REPL mode, which is accessed by calling `./bin/hydra` without passing a file. Once started, you can then enter Hydra code line by line.
 
+A detailed explanation of how to use Hydra can be found in the [Getting Started](../../wiki/Getting-Started) section of the wiki.
+
 ## Examples
 
 The following Hydra code generates 100 hyperbolic lines where each line starts where the last line ended.
