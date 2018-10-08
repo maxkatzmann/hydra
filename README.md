@@ -30,7 +30,7 @@ On the other hand, Hydra comes equipped with a REPL mode, which is accessed by c
 
 ## Examples
 
-The following Hydra code generates 100 hyperbolic lines where the each line starts where the last line ended.
+The following Hydra code generates 100 hyperbolic lines where each line starts where the last line ended.
 ``` swift
 // Define the maximum radial coordinate for a point.
 var R = 10.0
@@ -42,7 +42,8 @@ var point_1 = Pol(r: 0.0, phi: 0.0)
 // Iterate 100 times...
 for i in [0, 1, 99] {
 
-    // Define the second point of the current line by choosing radius and angular coordinate uniformly at random.
+    // Define the second point of the current line by choosing 
+    // radius and angular coordinate uniformly at random.
     var point_2 = Pol(r: random(from: 0.0, to: R), phi: random(from: 0.0, to: 2.0 * M_PI))
 
     // Draw the line.
