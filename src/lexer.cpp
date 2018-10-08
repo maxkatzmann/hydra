@@ -1514,8 +1514,8 @@ bool Lexer::parse_range(const std::vector<Token> &tokens, ParseResult &result) {
     result.type = Error;
     this->system.print_error_message(
         std::string(
-            "Invalid number of arguments in range. Expected one, but found ") +
-        std::to_string(tokens.size()) + ".");
+            "Invalid number of arguments in range. Expected 5, but found ") +
+        std::to_string(tokens[0].children.size()) + ".");
     return false;
   }
 

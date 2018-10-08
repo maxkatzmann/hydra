@@ -661,11 +661,21 @@ bool Interpreter::interpret_loop(const ParseResult &loop, std::any &result) {
     loop_variable += step_size;
 
     /**
+     * Now we clear the current scope and only add the loop variable
+     * back in.
+     *
+     * This allows the definition of variables within the
+     * loop. (Otherwise, a variable would be re-defined in the second
+     * loop iteration.)
+     */
+    this->system.state.scopes.back().clear();
+
+    /**
      * Now we set the new value in the current scope.
      */
     loop_variable_value = loop_variable;
-    if (!this->system.state.set_value_for_variable(
-            loop_variable_name, loop_variable_value, loop_scope_index)) {
+    if (!this->system.state.define_variable_with_value(loop_variable_name,
+                                                       loop_variable_value)) {
       this->system.print_error_message(
           std::string(
               "Could not interpret loop. Unable to update loop variable '") +
