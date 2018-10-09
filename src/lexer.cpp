@@ -1315,7 +1315,7 @@ bool Lexer::parse_loop(const std::vector<Token> &tokens,
   if (tokens.size() != 5) {
     result.type = Error;
     this->system.print_error_message(
-        std::string("Could not parse for-loop: invalid number of argument."));
+        std::string("Could not parse for-loop: invalid number of arguments."));
     return false;
   }
 
@@ -1325,7 +1325,8 @@ bool Lexer::parse_loop(const std::vector<Token> &tokens,
   if (tokens[0].value != "for") {
     result.type = Error;
     this->system.print_error_message(
-        std::string("Could not parse for-loop: invalid number of argument."));
+        std::string("Could not parse for-loop: Expected 'for' but found '") +
+        tokens[0].value + "'.");
     return false;
   }
 
@@ -1589,7 +1590,7 @@ bool Lexer::parse_string_token(const std::vector<Token> &tokens,
   if (tokens.size() != 1) {
     result.type = Error;
     this->system.print_error_message(
-        std::string("Invalid number of argument in string."));
+        std::string("Invalid number of arguments in string."));
     return false;
   }
 

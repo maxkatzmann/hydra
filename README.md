@@ -26,7 +26,7 @@ Hydra can be used in two ways. First, you can create a file containing Hydra cod
 ./bin/hydra mycode.hydra
 ```
 
-On the other hand, Hydra comes equipped with a REPL mode, which is accessed by calling `./bin/hydra` without passing a file. Once started, you can then enter Hydra code line by line.
+On the other hand, Hydra comes equipped with a REPL mode, which is accessed by calling `./bin/hydra` without passing a file. Once started, you can then enter Hydra code line by line. The REPL environment can be exited by entering `quit`.
 
 A detailed explanation of how to use Hydra can be found in the [Getting Started](../../wiki/Getting-Started) section of the wiki.
 

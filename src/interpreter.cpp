@@ -545,7 +545,7 @@ bool Interpreter::interpret_loop(const ParseResult &loop, std::any &result) {
    */
   if (loop.children[1].children.size() != 3) {
     this->system.print_error_message(
-        std::string("Invalid number of argument in range definition. Expected "
+        std::string("Invalid number of arguments in range definition. Expected "
                     "3 arguments but found ") +
         std::to_string(loop.children[1].children.size()) + "' instead.");
     return false;

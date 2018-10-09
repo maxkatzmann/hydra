@@ -154,7 +154,7 @@ void interpret_code_from_file(const std::string &file_name) {
  */
 void launch_REPL() {
 
-  std::cout << "Launching Hydra REPL:" << std::endl;
+  std::cout << "Launching Hydra REPL: (enter 'quit' to exit)" << std::endl;
 
   /**
    * What we need to interpret code is a System, the lexer that parses
