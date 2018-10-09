@@ -235,7 +235,7 @@ void launch_REPL() {
      */
     hydra::ParseResult parse_result;
     if (!lexer.parse_string(code_line, parse_result)) {
-      std::cerr << "Could not parse code. Not interpreting." << std::endl;
+      std::cerr << "(Code was not interpreted.)" << std::endl;
 
       /**
        * An error occurred we start over, with out having any code
@@ -265,7 +265,7 @@ void launch_REPL() {
     if (number_of_open_for_loops <= 0) {
 
       if (!lexer.parse_code(code, parsed_code)) {
-        std::cerr << "Could not parse code. Not interpreting." << std::endl;
+        std::cerr << "(Code was not interpreted.)" << std::endl;
 
         /**
          * An error occurred we start over, with out having any code
