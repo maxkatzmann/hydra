@@ -25,6 +25,7 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"exp", &Interpreter::function_exp},
       {"log", &Interpreter::function_log},
       {"line", &Interpreter::function_line},
+      {"mark", &Interpreter::function_mark},
       {"print", &Interpreter::function_print},
       {"random", &Interpreter::function_random},
       {"save", &Interpreter::function_save},

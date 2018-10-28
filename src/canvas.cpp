@@ -10,6 +10,12 @@
 #include <fstream>
 #include <glog/logging.h>
 
+/**
+ * Including the lexer here is probably not the nice way, but we need
+ * to determine the components in a string.
+ */
+#include <lexer.hpp>
+
 namespace hydra {
 
 void Canvas::add_path(const Path &path) {
@@ -32,10 +38,23 @@ void Canvas::save_to_file(const std::string &file_name) const {
    */
   std::fstream output_file_stream(file_name, std::fstream::out);
 
-  std::string ipe_representation;
-  ipe_canvas_representation(ipe_representation);
+  std::vector<std::string> file_name_components;
+  Lexer::components_in_string(file_name, file_name_components, ".");
+  std::string file_extension = file_name_components.back();
 
-  output_file_stream << ipe_representation;
+  std::string canvas_representation;
+
+  if (file_extension == "ipe") {
+    ipe_canvas_representation(canvas_representation);
+  } else if (file_extension == "svg") {
+    svg_canvas_representation(canvas_representation);
+  } else {
+    LOG(ERROR) << "Unrecognized file extension while saving canvas. Allowed "
+                  "extensions are: \".ipe\" and \".svg\"."
+               << std::endl;
+  }
+
+  output_file_stream << canvas_representation;
 }
 
 void Canvas::ipe_canvas_representation(std::string &ipe_representation) const {
@@ -115,6 +134,83 @@ void Canvas::ipe_canvas_representation(std::string &ipe_representation) const {
       "</ipe>";
 }
 
+void Canvas::svg_canvas_representation(std::string &svg_representation) const {
+
+  /**
+   * In order to obtain a nice drawing, we now determine the
+   * coordinate with the largest radius. When we know that, we
+   * translate everything such that all points are in the drawing
+   * canvas. (E.g. in Ipe the point 0,0 is in the bottom left and
+   * everything with negative x/y coordinates is out of the canvas.)
+   */
+  double maximum_radius = 0.0;
+
+  /**
+   * Find the maximum radius among the marks.
+   */
+  for (const Circle &mark : this->marks) {
+    if (mark.center.r > maximum_radius) {
+      maximum_radius = mark.center.r;
+    }
+  }
+
+  /**
+   * Find the maximum radius among the paths.
+   */
+  for (const Path &path : this->paths) {
+    for (const Pol point : path.points) {
+      if (point.r > maximum_radius) {
+        maximum_radius = point.r;
+      }
+    }
+  }
+
+  /**
+   * The offset that shifts everything.
+   */
+  Euc offset(this->scale * maximum_radius,
+             this->scale * maximum_radius);
+
+  /**
+   * SVG Header
+   */
+  svg_representation =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE svg PUBLIC "
+      "\"-//W3C//DTD SVG 1.1//EN\" "
+      "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n\n<svg "
+      "xmlns=\"http://www.w3.org/2000/svg\"\nxmlns:xlink=\"http://www.w3.org/"
+      "1999/xlink\" "
+      "xmlns:ev=\"http://www.w3.org/2001/xml-events\"\nversion=\"1.1\" ";
+
+  svg_representation += std::string("baseProfile=\"full\"\nwidth=\"") +
+                        std::to_string(offset.x * 2.0) + "\" height=\"" +
+                        std::to_string(offset.y * 2.0) + "\">\n\n";
+
+  /**
+   * Print Marks.
+   */
+  for (const Circle &mark : this->marks) {
+    std::string circle_representation;
+    Canvas::svg_circle_representation(mark, circle_representation, this->scale,
+                                      offset);
+    svg_representation += circle_representation;
+  }
+
+  /**
+   * Print Paths.
+   */
+  for (const Path &path : this->paths) {
+    std::string path_representation;
+    Canvas::svg_path_representation(path, path_representation, this->scale, offset);
+    svg_representation += path_representation;
+  }
+
+  /**
+   * Print SVG footer.
+   */
+  svg_representation += "\n</svg>\n";
+}
+
 /**
  * Creates a string that represents the passed path.
  */
@@ -157,6 +253,49 @@ void Canvas::ipe_path_representation(const Path &path,
   }
 }
 
+void Canvas::svg_path_representation(const Path &path,
+                                     std::string &svg_path_representation,
+                                     double scale, Euc offset) {
+
+  svg_path_representation = std::string("<path d =\"");
+
+  /**
+   * Only determine the representation if the path is not empty.
+   */
+  if (!path.empty()) {
+
+    /**
+     * Print the first point of the path.
+     */
+    Euc point(path.points[0], scale);
+    point.x += offset.x;
+    point.y += offset.y;
+    svg_path_representation += std::string("M ") + std::to_string(point.x) +
+                               "," + std::to_string(point.y) + " ";
+
+    /**
+     * Print the remaining points.
+     */
+    for (int index = 1; index < path.size(); ++index) {
+      point = Euc(path.points[index], scale);
+      point.x += offset.x;
+      point.y += offset.y;
+
+      svg_path_representation += std::string("L ") + std::to_string(point.x) + ", " + std::to_string(point.y) + " ";
+    }
+
+    if (path.is_closed) {
+      svg_path_representation += "Z";
+    }
+
+    double path_width = 0.2 * scale;
+
+    svg_path_representation +=
+        std::string("\" stroke = \"") + "black" + "\" stroke-width = \"" +
+        std::to_string(path_width) + "\" fill=\"none\"/>";
+  }
+}
+
 void Canvas::ipe_circle_representation(const Circle &circle,
                                        std::string &ipe_circle_representation,
                                        double scale, Euc offset) {
@@ -172,9 +311,35 @@ void Canvas::ipe_circle_representation(const Circle &circle,
   }
 
   ipe_circle_representation +=
-      std::string("\">\n") + std::to_string(circle.radius) + " 0 0 " +
-      std::to_string(circle.radius) + " " + std::to_string(center.x) + " " +
+      std::string(">\n") + std::to_string(circle.radius * scale) + " 0 0 " +
+      std::to_string(circle.radius * scale) + " " + std::to_string(center.x) + " " +
       std::to_string(center.y) + " e\n</path>\n";
+}
+
+void Canvas::svg_circle_representation(const Circle &circle,
+                                       std::string &svg_circle_representation,
+                                       double scale, Euc offset) {
+  Euc center(circle.center, scale);
+  center.x += offset.x;
+  center.y += offset.y;
+
+  double stroke_width = 0.2 * scale;
+
+  if (circle.is_filled) {
+    svg_circle_representation =
+        std::string("<circle cx=\"") + std::to_string(center.x) + "\" cy=\"" +
+        std::to_string(center.y) + "\" r=\"" +
+        std::to_string(circle.radius * scale) + "\" fill=\"" + "black" +
+        "\" stroke=\"" + "black" + "\" stroke-width=\"" +
+        std::to_string(stroke_width) + "\"/>\n";
+  } else {
+    svg_circle_representation =
+      std::string("<circle cx=\"") + std::to_string(center.x) + "\" cy=\"" +
+      std::to_string(center.y) + "\" r=\"" +
+      std::to_string(circle.radius * scale) + "\" fill=\"" + "none" +
+      "\" stroke=\"" + "black" + "\" stroke-width=\"" +
+      std::to_string(stroke_width) + "\"/>\n";
+  }
 }
 
 void Canvas::path_for_circle(const Pol &center, double radius, double resolution,

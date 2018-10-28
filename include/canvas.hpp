@@ -93,7 +93,7 @@ struct Euc {
 
     Pol center;
     double radius;
-    bool is_filled;
+    bool is_filled = true;
   };
 
   class Canvas {
@@ -151,6 +151,12 @@ struct Euc {
     void ipe_canvas_representation(std::string &ipe_representation) const;
 
     /**
+     * Creates the content of an SVG file that represents the current
+     * canvas.
+     */
+    void svg_canvas_representation(std::string &svg_representation) const;
+
+    /**
      * Creates a string that represents the passed path, by applying
      * the scale to each point and moving them by the passed offset.
      */
@@ -160,10 +166,26 @@ struct Euc {
                                         Euc offset = Euc(0.0, 0.0));
 
     /**
+     * Creates a string that represents the passed path, by applying
+     * the scale to each point and moving them by the passed offset.
+     */
+    static void svg_path_representation(const Path &path,
+                                        std::string &svg_path_representation,
+                                        double scale = 1.0,
+                                        Euc offset = Euc(0.0, 0.0));
+
+    /**
      * Creates a string that represents the passed mark.
      */
     static void ipe_circle_representation(
         const Circle &circle, std::string &ipe_circle_representation,
+        double scale = 1.0, Euc offset = Euc(0.0, 0.0));
+
+    /**
+     * Creates a string that represents the passed mark.
+     */
+    static void svg_circle_representation(
+        const Circle &circle, std::string &svg_circle_representation,
         double scale = 1.0, Euc offset = Euc(0.0, 0.0));
 
     // "Rendering":
