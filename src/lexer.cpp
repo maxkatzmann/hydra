@@ -19,6 +19,7 @@ Lexer::Lexer(System &system) : system(system) {
       {Expression, &Lexer::parse_expression},
       {Loop, &Lexer::parse_loop},
       {Function, &Lexer::parse_function},
+      {FunctionDefinition, &Lexer::parse_function_definition},
       {Initialization, &Lexer::parse_initialization},
       {Number, &Lexer::parse_number},
       {Braces, &Lexer::parse_brace},
@@ -229,6 +230,16 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
         Token token(System::error_string, type_of_string(System::error_string));
         tokens.push_back(token);
         return false;
+      }
+
+      /**
+       * We're currently evaluating the content within brackets.  If
+       * the first token is of type unknown but now we found
+       * parenthesis, we assume that we're actually dealing with a
+       * function call of a user defined function.
+       */
+      if (!tokens.empty() && tokens[0].type == Unknown) {
+        tokens[0].type = Function;
       }
 
       /**
@@ -512,6 +523,16 @@ bool Lexer::tokenize_string(const std::string &str, std::vector<Token> &tokens) 
      */
     Token token(current_token, type_of_string(current_token));
 
+    /**
+     * If the type of the token is unknown, but the previous token was
+     * a function definition token, we're currently dealing with the
+     * function name (that is being defined and therefore currently
+     * unknown).
+     */
+    if (!tokens.empty() && tokens.back().type == FunctionDefinition &&
+        token.type == Unknown) {
+      token.type = Function;
+    }
 
     /**
      * Check whether the current token represents a property
@@ -736,12 +757,17 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
       return false;
     }
 
+#ifdef DEBUG
+    print_parse_result(line_parse_result);
+#endif
+
     /**
      * If the line is a loop-definition, we add the loop definition to
      * the back of the current code_scope AND open a new code scope by
      * adding the children of the loop-definition to the code_scopes.
      */
-    if (line_parse_result.type == Loop) {
+    if (line_parse_result.type == Loop ||
+        line_parse_result.type == FunctionDefinition) {
       code_scopes.back()->push_back(line_parse_result);
       code_scopes.push_back(&(code_scopes.back()->back().children));
 
@@ -751,9 +777,10 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
       line_number_for_scope.push_back(line_parse_result.line_number);
     } else if (line_parse_result.type == Braces) {
       /**
-       * If the line is of type Braces, it is meant to close a
-       * loop. We close the loop by removing the children vector of
-       * the loop-parse-result from the code_scopes vector.
+       * If the line is of type Braces, it is meant to close a loop or
+       * end the definition of a function. We close the loop or
+       * function by removing the children vector of the
+       * loop-parse-result from the code_scopes vector.
        */
       code_scopes.pop_back();
       line_number_for_scope.pop_back();
@@ -761,6 +788,16 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
        * The parenthesis itself is useless and does not need to be
        * interpreted later, so we don't add it.
        */
+
+      /**
+       * However, if the last parsed code was indeed the definition of
+       * a function, we need to interpret that function definition
+       * now, so that we later know about the existence of that
+       * function.
+       */
+      if (code_scopes.back()->back().type == FunctionDefinition) {
+        
+      }
     } else {
       /**
        * The line is not a loop or parenthesis so we simply add it in
@@ -1216,6 +1253,183 @@ bool Lexer::parse_function(const std::vector<Token> &tokens,
    * If we didn't return, yet, something went wrong.
    */
   return false;
+}
+
+bool Lexer::parse_function_definition(const std::vector<Token> &tokens,
+                                      ParseResult &result) {
+  /**
+   * A function definition consists of the func token indicating that
+   * this is a function definition, followed by the name of the
+   * function with the parameters as children, followed by opening
+   * braces.
+   */
+  if (tokens.size() != 3) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid number of statements. A function is defined using "
+                    "'func name(param1, param2) {'."));
+    return false;
+  }
+
+  /**
+   * The first token should be a FunctionDefinition token.
+   */
+  if (tokens[0].type != FunctionDefinition) {
+    result.type = Error;
+    this->system.print_error_message(
+        std::string("Invalid syntax. Expected keyword 'func' but found '") +
+        tokens[0].value + "'instead , which is of type '" +
+        System::name_for_type.at(tokens[0].type));
+    return false;
+  }
+
+  /**
+   * The second token should be the function name with the parameters
+   * as children.
+   */
+
+  result.type = FunctionDefinition;
+  result.value = tokens[1].value;
+
+  /**
+   * Parse the functions parameter list
+   */
+  ParseResult parameter_list_parse_result;
+  parameter_list_parse_result.type = ParameterList;
+  parameter_list_parse_result.line_number = result.line_number; // Pass on line_number.
+
+  /**
+   * The parameter list should contain an odd number of tokens: n
+   * parameter names with n-1 commas in between.
+   */
+  if (tokens[1].children.size() % 2 != 1) {
+    this->system.print_error_message(std::string(
+        "Invalid syntax. The parameter list of a function definition should be "
+        "of the form 'parameter1, parameter2, parameter3,...'"));
+    return false;
+  }
+
+  /**
+   * The parameters are simply comma separated words.
+   */
+  for (int i = 0; i < (int)tokens[1].children.size(); ++i) {
+
+    Token token = tokens[1].children[i];
+
+    if (i % 2 == 0) {
+      /**
+       * At even values for i we expect a parameter name, which should
+       * not be a keyword, or another function name.
+       */
+      if (token.type != Unknown) {
+        this->system.print_error_message(
+            std::string("Invalid syntax. Expected parameter name but found '") +
+            token.value + "' instead, which is of type '" +
+            System::name_for_type.at(token.type));
+        return false;
+      }
+
+      /**
+       * The token seems to be a valid parameter name, so we add it as
+       * a child of the parse result.
+       */
+      ParseResult parameter_parse_result;
+      parameter_parse_result.line_number = result.line_number;
+      parameter_parse_result.type = Parameter;
+      parameter_parse_result.value = token.value;
+      parameter_list_parse_result.children.push_back(parameter_parse_result);
+    } else {
+
+      /**
+       * At odd values for i we expect a ,
+       */
+      if (token.value != ",") {
+        this->system.print_error_message(
+            std::string("Invalid syntax. Expected ',' but found '") +
+            token.value + "' instead.");
+        return false;
+      }
+    }
+  }
+
+  result.children.push_back(parameter_list_parse_result);
+
+  /**
+   * In order to correctly recognize the function later, we now have
+   * to tell the system, that the function exists, and what its
+   * parameters are.
+   */
+
+  /**
+   * This should be a function definition, so we add the function to
+   * the list of known functions.
+   *
+   * The value of the function definition is the name of the function.
+   */
+  Func new_function(result.value);
+
+  /**
+   * The function definition should have at least on child which contains
+   * the parameter list.
+   */
+  if (result.children.empty()) {
+    this->system.print_error_message(
+        std::string("Could not parse function definition '") +
+        result.value +
+        ": The function definition did not contain the parameter list.");
+    return false;
+  }
+
+  /**
+   * That child should be a parameter list.
+   */
+  if (result.children[0].type != ParameterList) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + result.value +
+        "'. Expected parameter list but found '" +
+        System::name_for_type.at(result.children[0].type) + "' instead.");
+    return false;
+  }
+
+  /**
+   * Now we collect the defined parameter names.
+   */
+  for (const ParseResult &parameter :
+         result.children[0].children) {
+    new_function.arguments.push_back(parameter.value);
+  }
+
+  /**
+   * Add the function in the map of known functions.
+   */
+  this->system.known_functions.insert(
+      std::pair<std::string, Func>(new_function.name, new_function));
+
+  /**
+   * It remains to save the statements of that function so that we can
+   * execute them later.
+   */
+  std::vector<ParseResult> function_statements;
+
+  /**
+   * Collect the statements, starting at index 1, since index 0 is the
+   * parameter list.
+   */
+  for (int i = 1; i < (int)result.children.size(); ++i) {
+    function_statements.push_back(result.children[i]);
+  }
+
+  /**
+   * Save the statements of that function for later lookup.
+   */
+  this->system.statements_for_functions.insert(
+      std::pair<std::string, std::vector<ParseResult>>(new_function.name,
+                                                       function_statements));
+
+  /**
+   * If we didn't return, yet, everything went fine.
+   */
+  return true;
 }
 
 bool Lexer::parse_initialization(const std::vector<Token> &tokens,

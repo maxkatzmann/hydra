@@ -31,17 +31,44 @@ enum Type {
   Error = 4,
   Expression = 5,
   Function = 6,
-  Loop = 7,
-  Initialization = 8,
-  Number = 9,
-  Operator = 10,
-  Braces = 11,
-  Property = 12,
-  Range = 13,
-  String = 14,
-  StringEscape = 15,
-  Unknown = 16,
-  Variable = 17
+  FunctionDefinition = 7,
+  Loop = 8,
+  Initialization = 9,
+  Number = 10,
+  Operator = 11,
+  Braces = 12,
+  Parameter = 13,
+  ParameterList = 14,
+  Property = 15,
+  Range = 16,
+  String = 17,
+  StringEscape = 18,
+  Unknown = 19,
+  Variable = 20
+};
+
+/**
+ * A parse result has a type, e.g. Assignment, a value (which is the
+ * original string that yielded the result) and a vector
+ * representing the child results of the parsing.
+ */
+struct ParseResult {
+  ParseResult() : type(Unknown), value(""), children({}) {}
+
+  ParseResult(Type type, const std::string &value) {
+    this->type = type;
+    this->value = value;
+  }
+
+  Type type = Unknown;
+  std::string value = "";
+  std::vector<ParseResult> children = {};
+
+  /**
+   * A parse result is associated with the number of the line from
+   * which it was parsed.
+   */
+  int line_number = -1;
 };
 
 /**
@@ -110,6 +137,13 @@ class System {
   * "line -> from:to:"
   */
  std::unordered_map<std::string, Func> known_functions;
+
+ /**
+  * In order to execute user defined functions, we need to store the
+  * statement for the corresponding function.
+  */
+ std::unordered_map<std::string, std::vector<ParseResult>>
+     statements_for_functions;
 
  /**
   * Prints an error message to the console.

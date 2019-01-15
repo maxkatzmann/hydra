@@ -41,31 +41,6 @@ struct Token {
   std::vector<Token> children = {};
 };
 
-/**
- * A parse result has a type, e.g. Assignment, a value (which is the
- * original string that yielded the result) and a vector
- * representing the child results of the parsing.
- */
-struct ParseResult {
-
-  ParseResult() : type(Unknown), value(""), children({}) {}
-
-  ParseResult(Type type, const std::string &value) {
-    this->type = type;
-    this->value = value;
-  }
-
-  Type type = Unknown;
-  std::string value = "";
-  std::vector<ParseResult> children = {};
-
-  /**
-   * A parse result is associated with the number of the line from
-   * which it was parsed.
-   */
-  int line_number = -1;
-};
-
 class Lexer {
  public:
 
@@ -178,6 +153,13 @@ class Lexer {
    * is not a function call, the result will have type Error.
    */
   bool parse_function(const std::vector<Token> &tokens, ParseResult &result);
+
+  /**
+   * Parses a string that represents a function definition (for user
+   * defined functions).  If the parsed string is not a function
+   * definition, the result will have type Error.
+   */
+  bool parse_function_definition(const std::vector<Token> &tokens, ParseResult &result);
 
   /**
    * Parses a string that represents an initialization.  If the parsed string

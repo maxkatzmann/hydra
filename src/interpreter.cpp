@@ -41,6 +41,7 @@ Interpreter::Interpreter(System &system) : system(system) {
       {Initialization, &Interpreter::interpret_initialization},
       {Expression, &Interpreter::interpret_expression},
       {Function, &Interpreter::interpret_function},
+      {FunctionDefinition, &Interpreter::interpret_function_definition},
       {Loop, &Interpreter::interpret_loop},
       {Number, &Interpreter::interpret_number},
       {String, &Interpreter::interpret_string},
@@ -1359,8 +1360,25 @@ bool Interpreter::interpret_function(const ParseResult &function_call,
   }
 
   /**
-   * Now we check if we know about a builtin function with the
-   * corresponding name.
+   * First we check whether we have a user defined function with the
+   * current name.
+   */
+  std::unordered_map<std::string, std::vector<ParseResult>>::const_iterator
+      position_of_statements =
+          this->system.statements_for_functions.find(function_call.value);
+
+  /**
+   * If we found statements for that function, we want to interpret
+   * the function as a user defined function.
+   */
+  if (position_of_statements != this->system.statements_for_functions.end()) {
+    return interpret_user_defined_function(function_call, result);
+  }
+
+  /**
+   * If we didn't identify this function call as a call to a user
+   * defined function, we now check if we know about a builtin
+   * function with the corresponding name.
    */
   std::unordered_map<std::string,
                      std::function<bool(Interpreter *, const ParseResult &,
@@ -1378,12 +1396,212 @@ bool Interpreter::interpret_function(const ParseResult &function_call,
      * Actually calling the function.
      */
     return function(this, function_call, result);
-  } else {
-    this->system.print_error_message(std::string("Could not interpret '") +
-                                     function_call.value +
-                                     "'. No function definition found.");
+  }
+
+  /**
+   * At this point we have neither found the function as a builtin
+   * function nor as a user defined function.  Therefore, we print an
+   * error message.
+   */
+  this->system.print_error_message(std::string("Could not interpret '") +
+                                   function_call.value +
+                                   "'. No function definition found.");
+  return false;
+}
+
+bool Interpreter::interpret_function_definition(
+    const ParseResult &function_definition, std::any &result) {
+
+  DLOG(INFO) << "Trying to interpret function definition: '"
+             << function_definition.value << "'." << std::endl;
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = function_definition.line_number;
+
+  /**
+   * We check whether we know this function and start the
+   * corresponding interpretation.
+   */
+  if (function_definition.type != FunctionDefinition) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_definition.value +
+        "'. Expected function definition but found '" +
+        System::name_for_type.at(function_definition.type) + "' instead.");
     return false;
   }
+
+  /**
+   * This should be a function definition, so we add the function to
+   * the list of known functions.
+   *
+   * The value of the function definition is the name of the function.
+   */
+  Func new_function(function_definition.value);
+
+  /**
+   * The function definition should have at least on child which contains
+   * the parameter list.
+   */
+  if (function_definition.children.empty()) {
+    this->system.print_error_message(
+        std::string("Could not interpret function definition '") +
+        function_definition.value +
+        ": The function definition did not contain the parameter list.");
+    return false;
+  }
+
+  /**
+   * That child should be a parameter list.
+   */
+  if (function_definition.children[0].type != ParameterList) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_definition.value +
+        "'. Expected parameter list but found '" +
+        System::name_for_type.at(function_definition.children[0].type) +
+        "' instead.");
+    return false;
+  }
+
+  /**
+   * Now we collect the defined parameter names.
+   */
+  for (const ParseResult &parameter :
+       function_definition.children[0].children) {
+    new_function.arguments.push_back(parameter.value);
+  }
+
+  /**
+   * Add the function in the map of known functions.
+   */
+  this->system.known_functions.insert(
+      std::pair<std::string, Func>(new_function.name, new_function));
+
+  /**
+   * It remains to save the statements of that function so that we can
+   * execute them later.
+   */
+  std::vector<ParseResult> function_statements;
+
+  /**
+   * Collect the statements, starting at index 1, since index 0 is the
+   * parameter list.
+   */
+  for (int i = 1; i < (int)function_definition.children.size(); ++i) {
+    function_statements.push_back(function_definition.children[i]);
+  }
+
+  /**
+   * Save the statements of that function for later lookup.
+   */
+  this->system.statements_for_functions.insert(
+      std::pair<std::string, std::vector<ParseResult>>(new_function.name,
+                                                       function_statements));
+
+  return true;
+}
+
+bool Interpreter::interpret_user_defined_function(
+    const ParseResult &function_call, std::any &result) {
+
+  DLOG(INFO) << "Trying to interpret user defined function: '"
+             << function_call.value << "'." << std::endl;
+
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Let the system state now, which line we're currently
+   * interpreting.
+   */
+  this->system.state.line_number = function_call.line_number;
+
+  /**
+   * We check whether we know this function and start the
+   * corresponding interpretation.
+   */
+  if (function_call.type != Function) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_call.value +
+        "'. Expected function but found '" +
+        System::name_for_type.at(function_call.type) + "' instead.");
+    return false;
+  }
+
+  /**
+   * First we check whether we actually have a user defined function
+   * with the current name.
+   */
+  std::unordered_map<std::string, std::vector<ParseResult>>::const_iterator
+    position_of_statements =
+    this->system.statements_for_functions.find(function_call.value);
+
+  /**
+   * If we found statements for that function, we want to interpret
+   * the function as a user defined function.
+   */
+  if (position_of_statements == this->system.statements_for_functions.end()) {
+    this->system.print_error_message(
+        std::string("Could not interpret '") + function_call.value +
+        "'. Could not find function definition for a function with that name.");
+    return false;
+  }
+
+  /**
+   * We open a new scope, since all variables defined in the function
+   * will be forgotten after the function.
+   */
+  this->system.state.open_new_scope();
+
+  /**
+   * At first we interpret the argument list.  And then define the
+   * parameter values in the newly opened scope.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
+
+  /**
+   * Now we iterate all arguments and define the corresponding values
+   * in the current scope.
+   */
+  for (const std::pair<std::string, std::any> &interpreted_argument : interpreted_arguments) {
+    this->system.state.define_variable_with_value(interpreted_argument.first,
+                                                  interpreted_argument.second);
+  }
+
+  DLOG(INFO) << "Defined argument values for used defined function." << std::endl;
+
+  /**
+   * Now we simply interpret all statements that belong to the
+   * function.
+   */
+  for (const ParseResult &parsed_statement : (*position_of_statements).second) {
+    if (!interpret_parse_result(parsed_statement, result)) {
+      return false;
+    }
+  }
+
+  /**
+   * When we're done executing, we remove the function scope.
+   */
+  this->system.state.close_scope();
+
+  /**
+   * If we did not return, yet, everything seems to be fine.
+   */
+  return true;
 }
 
 // Functions:

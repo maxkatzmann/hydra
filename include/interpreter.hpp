@@ -108,6 +108,22 @@ namespace hydra {
     bool interpret_function(const ParseResult &function_call, std::any &result);
 
     /**
+     * Interprets a function definition.  Returns false if an error
+     * occurred during interpretation.  The result contains the value
+     * of the interpretation.
+     */
+    bool interpret_function_definition(const ParseResult &function_definition,
+                                       std::any &result);
+
+    /**
+     * Interprets a user defined function.  Returns false if an error
+     * occurred during interpretation.  The result contains the value
+     * of the interpretation.
+     */
+    bool interpret_user_defined_function(const ParseResult &function_call,
+                                         std::any &result);
+
+    /**
      * Interprets an initialization.  Returns false if an error
      * occurred during interpretation.  The result contains the value
      * of the interpretation.

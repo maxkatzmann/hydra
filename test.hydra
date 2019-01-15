@@ -1,12 +1,22 @@
-print(message: "Bow to the mighty Hydra!\n")
+// Define the maximum radial coordinate for a point.
+var R = 10.0
 
-for i in [0, 1, 3] {
-    var j = 2 * i
+// Define the variable that holds the starting point of each line.
+// The initial value is the origin of the plane.
+var point_1 = Pol(r: 0.0, phi: 0.0)
 
-    for k in [0, 1, j] {
-        var l = 3 * k
-        print(message: "i = \(i), j = \(j), k = \(k), l = \(l)\n")
-    }
+// Iterate 100 times...
+for i in [0, 1, 99] {
+
+    // Define the second point of the current line by choosing radius and angular coordinate uniformly at random.
+    var point_2 = Pol(r: random(from: 0.0, to: R), phi: random(from: 0.0, to: 2.0 * M_PI))
+
+    // Draw the line.
+    line(from: point_1, to: point_2)
+
+    // The next line starts where the last line ended.
+    point_1 = point_2
 }
 
-print(message: "Done!\n")
+// Save the drawn lines to a file.
+save(file: "random_lines.ipe")
