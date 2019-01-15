@@ -250,7 +250,8 @@ void launch_REPL() {
      * If we're dealing with a loop, we do not interpret the code
      * immediately.
      */
-    if (parse_result.type == hydra::Loop) {
+    if (parse_result.type == hydra::Loop ||
+        parse_result.type == hydra::FunctionDefinition) {
       ++number_of_open_for_loops;
     } else if (parse_result.type == hydra::Braces) {
       /**

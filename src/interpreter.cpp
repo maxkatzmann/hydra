@@ -1439,17 +1439,14 @@ bool Interpreter::interpret_function_definition(
   }
 
   /**
-   * This should be a function definition, so we add the function to
-   * the list of known functions.
+   * This should be a function definition.  However, the definition of
+   * the function was already done by the lexer right when the
+   * function was defined, to ensure that later calls to the function
+   * would be recognized as such.
    *
-   * The value of the function definition is the name of the function.
+   * It remains to store the statements of the function for later use.
    */
-  Func new_function(function_definition.value);
 
-  /**
-   * The function definition should have at least on child which contains
-   * the parameter list.
-   */
   if (function_definition.children.empty()) {
     this->system.print_error_message(
         std::string("Could not interpret function definition '") +
@@ -1471,20 +1468,6 @@ bool Interpreter::interpret_function_definition(
   }
 
   /**
-   * Now we collect the defined parameter names.
-   */
-  for (const ParseResult &parameter :
-       function_definition.children[0].children) {
-    new_function.arguments.push_back(parameter.value);
-  }
-
-  /**
-   * Add the function in the map of known functions.
-   */
-  this->system.known_functions.insert(
-      std::pair<std::string, Func>(new_function.name, new_function));
-
-  /**
    * It remains to save the statements of that function so that we can
    * execute them later.
    */
@@ -1502,7 +1485,7 @@ bool Interpreter::interpret_function_definition(
    * Save the statements of that function for later lookup.
    */
   this->system.statements_for_functions.insert(
-      std::pair<std::string, std::vector<ParseResult>>(new_function.name,
+      std::pair<std::string, std::vector<ParseResult>>(function_definition.value,
                                                        function_statements));
 
   return true;

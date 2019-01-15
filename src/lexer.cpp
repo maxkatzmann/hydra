@@ -788,16 +788,6 @@ bool Lexer::parse_code(const std::vector<std::string> &code,
        * The parenthesis itself is useless and does not need to be
        * interpreted later, so we don't add it.
        */
-
-      /**
-       * However, if the last parsed code was indeed the definition of
-       * a function, we need to interpret that function definition
-       * now, so that we later know about the existence of that
-       * function.
-       */
-      if (code_scopes.back()->back().type == FunctionDefinition) {
-        
-      }
     } else {
       /**
        * The line is not a loop or parenthesis so we simply add it in
@@ -1407,24 +1397,10 @@ bool Lexer::parse_function_definition(const std::vector<Token> &tokens,
 
   /**
    * It remains to save the statements of that function so that we can
-   * execute them later.
+   * execute them later.  However, the statements of the function are
+   * not parsed, yet.  We leave the storage of the statements to the
+   * interpreter.
    */
-  std::vector<ParseResult> function_statements;
-
-  /**
-   * Collect the statements, starting at index 1, since index 0 is the
-   * parameter list.
-   */
-  for (int i = 1; i < (int)result.children.size(); ++i) {
-    function_statements.push_back(result.children[i]);
-  }
-
-  /**
-   * Save the statements of that function for later lookup.
-   */
-  this->system.statements_for_functions.insert(
-      std::pair<std::string, std::vector<ParseResult>>(new_function.name,
-                                                       function_statements));
 
   /**
    * If we didn't return, yet, everything went fine.
