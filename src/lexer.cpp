@@ -1290,9 +1290,10 @@ bool Lexer::parse_function_definition(const std::vector<Token> &tokens,
 
   /**
    * The parameter list should contain an odd number of tokens: n
-   * parameter names with n-1 commas in between.
+   * parameter names with n-1 commas in between.  This only holds, if
+   * there are parameters at all.
    */
-  if (tokens[1].children.size() % 2 != 1) {
+  if (!tokens[1].children.empty() && tokens[1].children.size() % 2 != 1) {
     this->system.print_error_message(std::string(
         "Invalid syntax. The parameter list of a function definition should be "
         "of the form 'parameter1, parameter2, parameter3,...'"));
