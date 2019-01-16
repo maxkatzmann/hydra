@@ -9,9 +9,19 @@
 
 namespace hydra {
 
-Pol::Pol(double r, double phi) : r(r), phi(phi) {}
+Pol::Pol(double r, double phi) : r(r), phi(phi) { normalize_phi(); }
 
-Pol::Pol(const Pol &p) : r(p.r), phi(p.phi) {}
+Pol::Pol(const Pol &p) : r(p.r), phi(p.phi) { normalize_phi(); }
+
+void Pol::normalize_phi() {
+  while (this->phi < 0.0) {
+    this->phi += 2.0 * M_PI;
+  }
+
+  while (this->phi > 2.0 * M_PI) {
+    this->phi -= 2.0 * M_PI;
+  }
+}
 
 std::string Pol::to_string() const {
   return std::string("Pol(") + std::to_string(this->r) + ", " +

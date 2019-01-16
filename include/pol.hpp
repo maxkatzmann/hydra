@@ -47,6 +47,15 @@ public:
 
   static double theta(double r_1, double r_2, double R);
 
+
+private:
+
+  /**
+   * During initialization or after certain operations it may happen
+   * that the angle is negative or above 2pi.  Since that may lead to
+   * issues, we find the equivalent angle between 0 and 2pi.
+   */
+  void normalize_phi();
 };
 }  // namespace hydra
 
