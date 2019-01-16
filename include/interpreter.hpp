@@ -243,18 +243,21 @@ namespace hydra {
     bool function_cos(const ParseResult &function_call, std::any &result);
     bool function_cosh(const ParseResult &function_call, std::any &result);
     bool function_curve_angle(const ParseResult &function_call, std::any &result);
+    bool function_distance(const ParseResult &function_call, std::any &result);
     bool function_exp(const ParseResult &function_call, std::any &result);
     bool function_log(const ParseResult &function_call, std::any &result);
     bool function_line(const ParseResult &function_call, std::any &result);
     bool function_mark(const ParseResult &function_call, std::any &result);
     bool function_print(const ParseResult &function_call, std::any &result);
     bool function_random(const ParseResult &function_call, std::any &result);
+    bool function_rotate(const ParseResult &function_call, std::any &result);
     bool function_save(const ParseResult &function_call, std::any &result);
     bool function_set_resolution(const ParseResult &function_call, std::any &result);
     bool function_sin(const ParseResult &function_call, std::any &result);
     bool function_sinh(const ParseResult &function_call, std::any &result);
     bool function_sqrt(const ParseResult &function_call, std::any &result);
     bool function_theta(const ParseResult &function_call, std::any &result);
+    bool function_translate(const ParseResult &function_call, std::any &result);
 
     /**
      * Determines the string representation of an interpretation

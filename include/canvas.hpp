@@ -122,7 +122,7 @@ struct Euc {
      * represented by 1 pixel, we add a scale. Not sure whether the
      * scale directly translates to the number of pixels though.
      */
-    double scale = 15.0;
+    double scale = 30.0;
 
     /**
      * Convenience method to add a path to the canvas.

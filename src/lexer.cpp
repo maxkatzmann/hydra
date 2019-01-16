@@ -1395,6 +1395,9 @@ bool Lexer::parse_function_definition(const std::vector<Token> &tokens,
   this->system.known_functions.insert(
       std::pair<std::string, Func>(new_function.name, new_function));
 
+  this->system.types_for_keywords.insert(
+      std::pair<std::string, Type>(new_function.name, Function));
+
   /**
    * It remains to save the statements of that function so that we can
    * execute them later.  However, the statements of the function are

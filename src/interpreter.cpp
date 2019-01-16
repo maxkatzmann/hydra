@@ -22,18 +22,21 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"cos", &Interpreter::function_cos},
       {"cosh", &Interpreter::function_cosh},
       {"curve_angle", &Interpreter::function_curve_angle},
+      {"distance", &Interpreter::function_distance},
       {"exp", &Interpreter::function_exp},
       {"log", &Interpreter::function_log},
       {"line", &Interpreter::function_line},
       {"mark", &Interpreter::function_mark},
       {"print", &Interpreter::function_print},
       {"random", &Interpreter::function_random},
+      {"rotate", &Interpreter::function_rotate},
       {"save", &Interpreter::function_save},
       {"set_resolution", &Interpreter::function_set_resolution},
       {"sin", &Interpreter::function_sin},
       {"sinh", &Interpreter::function_sinh},
       {"sqrt", &Interpreter::function_sqrt},
-      {"theta", &Interpreter::function_theta}
+      {"theta", &Interpreter::function_theta},
+      {"translate", &Interpreter::function_translate}
   };
 
   this->known_interpretations = {

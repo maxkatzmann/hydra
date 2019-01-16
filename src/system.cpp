@@ -58,12 +58,14 @@ System::System() {
                               {"Pol", Initialization},
                               {"print", Function},
                               {"random", Function},
+                              {"rotate", Function},
                               {"save", Function},
                               {"set_resolution", Function},
                               {"sin", Function},
                               {"sinh", Function},
                               {"show", Function},
                               {"theta", Function},
+                              {"translate", Function},
                               {"var", Assignment},
                               {"+", Operator},
                               {"-", Operator},
@@ -83,6 +85,7 @@ System::System() {
                            {"cosh", Func("cosh", {"x"})},
                            {"curve_angle", Func("curve_angle", {"from", "to", "angle"})},
                            {"curve_distance", Func("curve_distance", {"from", "to", "distance"})},
+                           {"distance", Func("distance", {"from", "to"})},
                            {"Euc", Func("Euc", {"x", "y"})},
                            {"exp", Func("exp", {"x"})},
                            {"line", Func("line", {"from", "to"})},
@@ -91,12 +94,14 @@ System::System() {
                            {"Pol", Func("Pol", {"r", "phi"})},
                            {"print", Func("print", {"message"})},
                            {"random", Func("random", {"from", "to"})},
+                           {"rotate", Func("rotate", {"point", "by"})},
                            {"save", Func("save", {"file"})},
                            {"set_resolution", Func("set_resolution", {"x"})},
                            {"sin", Func("sin", {"x"})},
                            {"sinh", Func("sinh", {"x"})},
                            {"show", Func("show", {})},
-                           {"theta", Func("theta", {"r1", "r2", "R"})}};
+                           {"theta", Func("theta", {"r1", "r2", "R"})},
+                           {"translate", Func("translate", {"point", "by"})}};
 }
 
 void System::print_error_message(const std::string &message) {

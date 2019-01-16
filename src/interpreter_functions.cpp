@@ -256,7 +256,7 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
   this->system.state.open_new_scope();
 
   PropertyMap current_point;
-  current_point[System::type_string] = "Pol";
+  current_point[System::type_string] = std::string("Pol");
   current_point["r"] = radius;
   current_point["phi"] = from.phi;
 
@@ -354,6 +354,43 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
    */
   this->canvas.add_path(path);
 
+  return true;
+}
+
+bool Interpreter::function_distance(const ParseResult &function_call,
+                                    std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  Pol from;
+  if (!pol_value_for_parameter("from", interpreted_arguments, from)) {
+    return false;
+  }
+
+  Pol to;
+  if (!pol_value_for_parameter("to", interpreted_arguments, to)) {
+    return false;
+  }
+
+  /**
+   * Compute the result.
+   */
+  result = from.distance_to(to);
   return true;
 }
 
@@ -592,6 +629,131 @@ bool Interpreter::function_random(const ParseResult &function_call,
   std::uniform_real_distribution<double> distribution(from, to);
 
   result = distribution(mersenne_twister);
+  return true;
+}
+
+bool Interpreter::function_rotate(const ParseResult &function_call,
+                                  std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  Pol point;
+  if (!pol_value_for_parameter("point", interpreted_arguments, point)) {
+    return false;
+  }
+
+  /**
+   * Try interpreting the angle argument.
+   */
+  double angle;
+  if (!number_value_for_parameter("by", interpreted_arguments, angle)) {
+    return false;
+  }
+
+  /**
+   * Actually rotating.
+   */
+  point.rotate_by(angle);
+
+  /**
+   * Non-primitive types are defined using maps. The maps contains a
+   * key for the type and one for each property.
+   */
+  PropertyMap property_map;
+
+  /**
+   * Assign the type.
+   */
+  property_map[System::type_string] = std::string("Pol");
+
+  /**
+   * Assign the properties from the initialization.
+   */
+  property_map["r"] = point.r;
+  property_map["phi"] = point.phi;
+
+  /**
+   * The result is the property map.
+   */
+  result = property_map;
+
+  return true;
+}
+
+bool Interpreter::function_translate(const ParseResult &function_call,
+                                     std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  if (!interpret_arguments_from_function_call(function_call,
+                                              interpreted_arguments)) {
+    return false;
+  }
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  Pol point;
+  if (!pol_value_for_parameter("point", interpreted_arguments, point)) {
+    return false;
+  }
+
+  /**
+   * Try interpreting the angle argument.
+   */
+  double distance;
+  if (!number_value_for_parameter("by", interpreted_arguments, distance)) {
+    return false;
+  }
+
+  point.translate_horizontally_by(distance);
+
+  /**
+   * Preparing the variable that holds the result of the translation.
+   *
+   * Non-primitive types are defined using maps. The maps contains a
+   * key for the type and one for each property.
+   */
+  PropertyMap property_map;
+
+  /**
+   * Assign the type.
+   */
+  property_map[System::type_string] = std::string("Pol");
+
+  /**
+   * Assign the properties from the initialization.
+   */
+  property_map["r"] = point.r;
+  property_map["phi"] = point.phi;
+
+  /**
+   * The result is the property map.
+   */
+  result = property_map;
+
   return true;
 }
 
