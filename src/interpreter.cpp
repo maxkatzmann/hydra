@@ -22,6 +22,7 @@ Interpreter::Interpreter(System &system) : system(system) {
       {"cos", &Interpreter::function_cos},
       {"cosh", &Interpreter::function_cosh},
       {"curve_angle", &Interpreter::function_curve_angle},
+      {"curve_distance", &Interpreter::function_curve_distance},
       {"distance", &Interpreter::function_distance},
       {"exp", &Interpreter::function_exp},
       {"log", &Interpreter::function_log},

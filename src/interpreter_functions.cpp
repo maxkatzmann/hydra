@@ -357,6 +357,241 @@ bool Interpreter::function_curve_angle(const ParseResult &function_call,
   return true;
 }
 
+bool Interpreter::function_curve_distance(const ParseResult &function_call,
+                                          std::any &result) {
+  DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
+  /**
+   * Reset the result so the check for has_value fails.
+   */
+  result.reset();
+
+  /**
+   * Interpret the arguments. Note, that we don't interpret all
+   * arguments initially. That is because the last argument might
+   * contain the hidden variable _p which will only be evaluated when
+   * _p is known.
+   */
+  std::unordered_map<std::string, std::any> interpreted_arguments;
+  if (!interpret_arguments_from_function_call(function_call, interpreted_arguments,
+                                              {"from", "to"})) {
+    return false;
+  }
+
+  /**
+   * Now we try to obtain the actual argument value.
+   */
+  Pol from;
+  if (!pol_value_for_parameter("from", interpreted_arguments, from)) {
+    return false;
+  }
+
+  Pol to;
+  if (!pol_value_for_parameter("to", interpreted_arguments, to)) {
+    return false;
+  }
+
+  /**
+   * Add the curve to the canvas.
+   */
+  Path path;
+  path.is_closed = false;
+
+  /**
+   * We create the points of the path by iteratively increasing the
+   * radius, and evaluating the angle argument.
+   */
+  const double step_size = (from.distance_to(to)) / this->canvas.resolution;
+  DLOG(INFO) << "Step size: " << step_size << std::endl;
+
+  /**
+   * If the step size is not positive, we will run into an infinite
+   * loop. We rather throw an error before.
+   */
+  if (!(step_size > 0)) {
+    this->system.print_error_message(
+        std::string("Invalid step size <= 0 in function '") +
+        function_call.value +
+        "'. Make sure that 'to' and 'from' are not the same point.");
+    return false;
+  }
+
+  double radius = from.r;
+
+  /**
+   * We add current point (on the line) as the hidden variable _p to
+   * a new scope that will only live for this function execution.
+   */
+  this->system.state.open_new_scope();
+
+  PropertyMap current_point;
+  current_point[System::type_string] = std::string("Pol");
+  current_point["r"] = radius;
+  current_point["phi"] = from.phi;
+
+  const std::string hidden_variable_name = "_p";
+
+  int current_scope =
+      this->system.state.define_variable_with_value(hidden_variable_name, current_point);
+
+  /**
+   * In the loop we iteratively evaluate the distance argument.
+   */
+  std::unordered_map<std::string, std::any> interpreted_distance_argument;
+  double distance = 0.0;
+
+  /**
+   * Here is how it works.  We move the line that was defined by
+   * (from, to) such that 'from' lies on the origin and 'to' as angle
+   * 0.  We then walk from 'from' to 'to' and determine the current
+   * point on then line by reversing the initial movement.  The
+   * resulting point is saved as the hidden variable _p and we
+   * determine the distance that should be used at this point.  We
+   * apply this distance at the current point and reverse the
+   * movement.
+   */
+
+  /**
+   * We start with the initial movement.
+   *
+   * Rotate everything such that 'from' has angle 0.  (We don't need
+   * to actually perform this rotation on from.)
+   */
+  double rotation_angle = -from.phi;
+  Pol rotated_to(to.r, to.phi);
+  rotated_to.rotate_by(rotation_angle);
+
+  /**
+   * Translate everything such that 'from' lies on the origin.
+   */
+  double translation_distance = -from.r;
+  Pol translated_to(rotated_to.r, rotated_to.phi);
+  translated_to.translate_horizontally_by(translation_distance);
+
+  /**
+   * Rotate everything such that 'to' has angle 0.
+   */
+  double second_rotation_angle = -translated_to.phi;
+
+  /**
+   * Since we have several levels of detail (closer to the origin, we
+   * have a smaller step size) but we have to use the same mechanism
+   * for all these points, we create a vector containing all the
+   * radii, that we need.
+   */
+  std::vector<double> radii;
+  for (double radius = 0.0; radius < translated_to.r; radius += step_size) {
+    radii.push_back(radius);
+  }
+
+  for (const double &r : radii) {
+
+    /**
+     * Determine the current point on the actual line by reversing the
+     * initial movement.
+     */
+    Pol current_helper_point(r, 0.0);
+
+    Pol rotated_current_helper_point(current_helper_point.r, current_helper_point.phi);
+    rotated_current_helper_point.rotate_by(-second_rotation_angle);
+
+    Pol translated_current_helper_point(rotated_current_helper_point.r,
+                                        rotated_current_helper_point.phi);
+    translated_current_helper_point.translate_horizontally_by(-translation_distance);
+
+    Pol current_helper_point_on_line(translated_current_helper_point.r,
+                                     translated_current_helper_point.phi);
+    current_helper_point_on_line.rotate_by(-rotation_angle);
+
+    /**
+     * Update the radius of the hidden variable _p.
+     */
+    current_point["r"] = current_helper_point_on_line.r;
+    current_point["phi"] = current_helper_point_on_line.phi;
+    this->system.state.set_value_for_variable(hidden_variable_name,
+                                              current_point, current_scope);
+
+    /**
+     * Now that the hidden variable is defined, we interpret the angle
+     * argument.
+     */
+    if (!interpret_arguments_from_function_call(function_call, interpreted_distance_argument,
+                                                {"distance"})) {
+      return false;
+    }
+
+    /**
+     * We try to get the angle value.
+     */
+    if (!number_value_for_parameter("distance", interpreted_distance_argument,
+                                    distance)) {
+      return false;
+    }
+
+    /**
+     * If the distance is negative, it means we should draw the curve
+     * on the other side of the line.
+     */
+    double resulting_radius = fabs(distance);
+    double resulting_angle = M_PI / 2;
+    if (distance < 0) {
+      resulting_angle = (2.0 * M_PI) - (M_PI / 2.0);
+    }
+
+    /**
+     * Create the point with the determined distance.
+     *
+     * We do that by first creating the point with the specified
+     * distance to the origin (perpendicular to the ray starting at
+     * the origin with angle 0), and then translating it along that
+     * ray.
+     */
+    Pol resulting_point(resulting_radius, resulting_angle);
+
+    /**
+     * Translate that point along the reference ray.
+     */
+    resulting_point.translate_horizontally_by(r);
+
+    /**
+     * Now we apply the reverse movement (from the beginning) on the
+     * resulting point to get the corresponding point relative to the
+     * specified (from, to) line.
+     */
+    Pol rotated_resulting_point(resulting_point.r, resulting_point.phi);
+    rotated_resulting_point.rotate_by(-second_rotation_angle);
+
+    Pol translated_resulting_point(rotated_resulting_point.r,
+                                   rotated_resulting_point.phi);
+    translated_resulting_point.translate_horizontally_by(-translation_distance);
+
+    Pol final_resulting_point(translated_resulting_point.r,
+                              translated_resulting_point.phi);
+    final_resulting_point.rotate_by(-rotation_angle);
+
+    /**
+     * Add the point to the path.
+     */
+    path.push_back(final_resulting_point);
+  }
+
+  /**
+   * We now close the scope that holds the hidden variable.
+   */
+  if (!this->system.state.close_scope()) {
+    this->system.print_error_message(std::string(
+        "Could not close hidden variable scope as that would mean closing the "
+        "last scope."));
+    return false;
+  }
+
+  /**
+   * Actually adding the path to the canvas.
+   */
+  this->canvas.add_path(path);
+
+  return true;
+}
+
 bool Interpreter::function_distance(const ParseResult &function_call,
                                     std::any &result) {
   DLOG(INFO) << "Interpreting " << function_call.value << "." << std::endl;
